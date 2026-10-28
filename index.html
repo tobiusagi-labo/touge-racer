@@ -364,7 +364,7 @@
         </div>
         <div class="hud-bottom-right">
           <button class="action-btn" id="restartBtn">やり直す</button>
-          <div class="hud-ver-label">ver 0.3.0</div>
+          <div class="hud-ver-label">ver 0.3.1</div>
         </div>
       </div>
     </div>
@@ -372,13 +372,13 @@
     <!-- Start / Goal Modal -->
     <div class="modal-overlay" id="gameModal">
       <div class="modal-box">
-        <div class="modal-ver-badge">ver 0.3.0</div>
+        <div class="modal-ver-badge">ver 0.3.1</div>
         <div class="modal-title" id="modalTitle">峠 TOUGE RACER</div>
         <div class="modal-desc" id="modalDesc">
-          <strong>【離して発動の新操作感！】</strong><br>
-          ・タップして<strong>離すとその方向へダッシュ！</strong><br>
-          ・指でカーブを描いて<strong>離すとラインに沿ってドリフト突撃！</strong><br>
-          壁にぶつからずに走るとスピード加速！
+          <strong>【離して発動！】</strong><br>
+          ・短くタップして<strong>離すとその方向へダッシュ！</strong><br>
+          ・カーブを描いて<strong>離すとラインに沿ってドリフト突撃！</strong><br>
+          ※壁にぶつかっても安全に跳ね返り、そのまま走り続けられます！
         </div>
         <div class="modal-stats" id="modalStats" style="display:none;">
           <div class="stat-row"><span>ゴールタイム:</span><span class="stat-val" id="finalTime">00:00.00</span></div>
@@ -473,7 +473,7 @@ class SoundEngine {
       filter.Q.setValueAtTime(3.0, t);
 
       this.driftGain.gain.setValueAtTime(0.01, t);
-      this.driftGain.gain.linearRampToValueAtTime(0.09, t + 0.05);
+      this.driftGain.gain.linearRampToValueAtTime(0.08, t + 0.05);
 
       this.driftOsc.connect(filter);
       filter.connect(this.driftGain);
@@ -506,7 +506,7 @@ class SoundEngine {
       osc.frequency.setValueAtTime(130, t);
       osc.frequency.exponentialRampToValueAtTime(35, t + 0.16);
 
-      gain.gain.setValueAtTime(0.28, t);
+      gain.gain.setValueAtTime(0.25, t);
       gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
 
       osc.connect(gain);
@@ -557,7 +557,7 @@ class SoundEngine {
 const sound = new SoundEngine();
 
 /* ==========================================================================
-   Touge Track (落下なし・安全なガードレール全周設計)
+   Touge Track
    ========================================================================== */
 class Track {
   constructor() {
@@ -663,10 +663,11 @@ class Track {
     };
   }
 
+  // 中心線への投影点と距離を安定して取得
   getTrackRelation(px, py) {
     let minDist = Infinity;
     let closestSeg = null;
-    let signedDistance = 0;
+    let closestProj = { x: px, y: py };
 
     for (let i = 0; i < this.segments.length; i++) {
       const seg = this.segments[i];
@@ -681,7 +682,7 @@ class Track {
       if (d < minDist) {
         minDist = d;
         closestSeg = seg;
-        signedDistance = (seg.dx * vy - seg.dy * vx) / seg.dist;
+        closestProj = { x: projX, y: projY };
       }
     }
 
@@ -689,7 +690,7 @@ class Track {
     return {
       minDist,
       closestSeg,
-      signedDistance,
+      proj: closestProj,
       isInsideRoad: minDist <= halfW
     };
   }
@@ -714,7 +715,6 @@ class Car {
     this.angle = this.startAngle;
     this.speed = 0;
 
-    // 車体サイズ：適度に見やすい大きさ（38x20）
     this.width = 20;
     this.length = 38;
 
@@ -740,7 +740,6 @@ class Car {
     this.vx = Math.cos(this.angle) * power;
     this.vy = Math.sin(this.angle) * power;
 
-    // ドリフト状態をリセットして直線ダッシュ
     this.isDrifting = false;
     this.driftPath = [];
     sound.stopDriftSound();
@@ -748,15 +747,19 @@ class Car {
     return true;
   }
 
-  // 「離したら描いた線に沿ってドリフトスタート！」
-  startDriftAlongPath(points) {
-    if (!points || points.length < 2) return;
+  // 「離したら描いた線に沿ってドリフト開始！」
+  startDriftAlongPath(rawPoints) {
+    if (!rawPoints || rawPoints.length < 2) return;
+
+    // 自車の位置から繋がる滑らかなポイント列を構築
+    const points = [{ x: this.x, y: this.y }, ...rawPoints];
+
     this.driftPath = points;
-    this.driftIndex = 0;
+    this.driftIndex = 1; // 最初の目的地へ
     this.isDrifting = true;
 
-    // 最初のポイントに向けて即時加速
-    const firstTarget = points[Math.min(1, points.length - 1)];
+    // 最初の進行方向に向けて加速
+    const firstTarget = points[1];
     const ang = Math.atan2(firstTarget.y - this.y, firstTarget.x - this.x);
     this.angle = ang;
 
@@ -771,16 +774,19 @@ class Car {
   update(track, particles) {
     this.speed = Math.hypot(this.vx, this.vy);
 
-    // 描いたラインに沿ってドリフトトレース
+    // ドリフト制御（逆向き・終点スピン対策済み）
     if (this.isDrifting && this.driftPath.length > 0) {
-      // 現在の目標ポイントを探す
+      // 自車より前にある有効な目標点を探す
       while (this.driftIndex < this.driftPath.length) {
         const pt = this.driftPath[this.driftIndex];
         const dist = Math.hypot(pt.x - this.x, pt.y - this.y);
-        if (dist > 35) break;
+        
+        // すでに通過したか、十分近づいたポイントは次に進める
+        if (dist > 30) break;
         this.driftIndex++;
       }
 
+      // 残りの点がある場合
       if (this.driftIndex < this.driftPath.length) {
         const targetPt = this.driftPath[this.driftIndex];
         const targetAng = Math.atan2(targetPt.y - this.y, targetPt.x - this.x);
@@ -788,22 +794,24 @@ class Car {
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff -= Math.PI * 2;
 
-        // ドリフト旋回
-        this.angle += diff * 0.28;
+        // 終点付近（ラスト2点）では角速度を抑制してスピンを防止！
+        const isNearEnd = (this.driftIndex >= this.driftPath.length - 2);
+        const turnRate = isNearEnd ? 0.14 : 0.22;
+        this.angle += diff * turnRate;
 
-        // 横滑り成分を含みつつ推進
+        // スピードを維持しつつ推進
         const fX = Math.cos(this.angle);
         const fY = Math.sin(this.angle);
-        const targetSpd = Math.max(6.0, this.speed * 0.98);
-        this.vx = this.vx * 0.82 + fX * targetSpd * 0.18;
-        this.vy = this.vy * 0.82 + fY * targetSpd * 0.18;
+        const targetSpd = Math.max(5.5, this.speed * 0.98);
+        this.vx = this.vx * 0.84 + fX * targetSpd * 0.16;
+        this.vy = this.vy * 0.84 + fY * targetSpd * 0.16;
 
-        if (this.speed > 2.5) {
+        if (this.speed > 2.2) {
           particles.addSkidMark(this.x, this.y, this.angle, this.width);
           particles.addSmoke(this.x, this.y, this.angle, this.width);
         }
       } else {
-        // ラインを最後まで走りきったらグリップ復帰
+        // ドリフト終了：スピンせずスムーズに前を向いてグリップ復帰
         this.isDrifting = false;
         this.driftPath = [];
         sound.stopDriftSound();
@@ -839,33 +847,48 @@ class Car {
       }
     }
 
-    // ガードレール衝突判定（落下は完全排除！）
+    // 壁衝突＆確実な境界クランプ判定（絶対に進行不能にならない！）
     this.checkCollision(track, particles);
   }
 
+  // ★重要改善：壁の押し戻しを完全な道路内側クランプに変更
   checkCollision(track, particles) {
     const rel = track.getTrackRelation(this.x, this.y);
     const halfRoad = track.roadWidth / 2;
+    const safeLimit = halfRoad - 8; // 安全な内側マージン
 
-    if (!rel.isInsideRoad) {
-      const seg = rel.closestSeg;
-      if (seg) {
+    // コース境界を越えた場合
+    if (rel.minDist > safeLimit) {
+      const proj = rel.proj;
+      const offX = this.x - proj.x;
+      const offY = this.y - proj.y;
+      const dist = Math.hypot(offX, offY) || 0.001;
+
+      // 1. 車両位置を中心線から safeLimit の位置に「道路の内側へ確実に引き戻す」
+      // （※外側に押し出される心配が物理的にゼロになります！）
+      this.x = proj.x + (offX / dist) * safeLimit;
+      this.y = proj.y + (offY / dist) * safeLimit;
+
+      // 2. 壁に向かう速度成分（法線方向速度）のみを打ち消して反射
+      const nx = offX / dist;
+      const ny = offY / dist;
+      const normalVel = this.vx * nx + this.vy * ny;
+
+      if (normalVel > 0) { // 外側に向かって進んでいる場合
         sound.playCrash();
-        particles.addSparks(this.x, this.y, -seg.nx, -seg.ny);
+        particles.addSparks(this.x, this.y, -nx, -ny);
 
-        // ガードレールからの安全な押し戻し
-        const pushDist = (rel.minDist - halfRoad) + 6;
-        const sign = rel.signedDistance >= 0 ? 1 : -1;
-        this.x += seg.nx * pushDist * sign;
-        this.y += seg.ny * pushDist * sign;
+        // 壁に向かう速度を跳ね返し、接線（道路沿い）の速度は残す（壁沿いに滑れる）
+        this.vx -= normalVel * 1.3;
+        this.vy -= normalVel * 1.3;
 
-        // 反射＆減速
-        this.vx = -this.vx * 0.35;
-        this.vy = -this.vy * 0.35;
-
-        // コンボリセット＆ドリフト中断
+        // 速度半減＆コンボリセット
+        this.vx *= 0.55;
+        this.vy *= 0.55;
         this.boostLevel = 1;
         this.noCrashDistance = 0;
+
+        // ドリフト中なら中断
         if (this.isDrifting) {
           this.isDrifting = false;
           this.driftPath = [];
@@ -1004,7 +1027,6 @@ class TougeGame {
       y: startNode.y
     };
 
-    // 指で描いている最中の軌跡データ（リリーストリガー用）
     this.drawingPoints = [];
     this.isPointerDown = false;
     this.tapIndicator = null;
@@ -1064,9 +1086,6 @@ class TougeGame {
       this.resetRace();
     });
 
-    /* ==========================================================================
-       【新仕様】「離したらダッシュ」「離したら描いた線に沿ってドリフト開始」
-       ========================================================================== */
     const handleStart = (clientX, clientY) => {
       sound.init();
       if (this.gameState !== 'RUNNING') return;
@@ -1080,9 +1099,8 @@ class TougeGame {
       if (!this.isPointerDown || this.gameState !== 'RUNNING') return;
       const worldPos = this.screenToWorld(clientX, clientY);
 
-      // 前の点と一定以上離れていたら追加
       const last = this.drawingPoints[this.drawingPoints.length - 1];
-      if (!last || Math.hypot(worldPos.x - last.x, worldPos.y - last.y) > 10) {
+      if (!last || Math.hypot(worldPos.x - last.x, worldPos.y - last.y) > 12) {
         this.drawingPoints.push(worldPos);
       }
     };
@@ -1097,7 +1115,6 @@ class TougeGame {
 
       if (this.drawingPoints.length === 0) return;
 
-      // 始点と終点の距離、および累積移動距離を計算
       const startPt = this.drawingPoints[0];
       const endPt = this.drawingPoints[this.drawingPoints.length - 1];
       const directDist = Math.hypot(endPt.x - startPt.x, endPt.y - startPt.y);
@@ -1110,10 +1127,8 @@ class TougeGame {
         );
       }
 
-      // 判定：短くタップして離した場合は「離したらダッシュ！」
-      // 指でなぞって線を描いて離した場合は「離したらドリフトスタート！」
-      if (totalPathLen < 30 || directDist < 25) {
-        // ダッシュ！
+      // 短いタップの場合は「離したらダッシュ！」
+      if (totalPathLen < 25 || directDist < 20) {
         const dashed = this.car.dashToward(endPt.x, endPt.y);
         this.tapIndicator = {
           x: endPt.x,
@@ -1123,14 +1138,14 @@ class TougeGame {
           alpha: 0.9
         };
       } else {
-        // ドリフトスタート！
+        // 線を引いて離した場合は「ドリフト開始！」
         this.car.startDriftAlongPath(this.drawingPoints);
       }
 
       this.drawingPoints = [];
     };
 
-    // タッチイベント
+    // タッチ
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const t = (e.changedTouches && e.changedTouches[0]) || e.touches[0];
@@ -1153,7 +1168,7 @@ class TougeGame {
       handleEnd();
     }, { passive: false });
 
-    // PCマウスイベント
+    // PCマウス
     this.canvas.addEventListener('mousedown', (e) => {
       handleStart(e.clientX, e.clientY);
     });
@@ -1316,7 +1331,7 @@ class TougeGame {
     // 3. タイヤ痕＆粒子
     this.particles.draw(ctx);
 
-    // 4. 指でなぞり中のライン描画（リリーストリガー予告ガイド）
+    // 4. 指でなぞり中のライン描画
     this.renderDrawingLine(ctx);
 
     // 5. 走行中のドリフトガイドライン
@@ -1346,7 +1361,6 @@ class TougeGame {
     this.renderMinimap();
   }
 
-  // 指で描いている最中のガイドライン
   renderDrawingLine(ctx) {
     if (!this.isPointerDown || this.drawingPoints.length < 2) return;
     ctx.save();
@@ -1364,7 +1378,6 @@ class TougeGame {
     }
     ctx.stroke();
 
-    // 終点の矢印・ドット
     const end = this.drawingPoints[this.drawingPoints.length - 1];
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
@@ -1373,11 +1386,10 @@ class TougeGame {
     ctx.restore();
   }
 
-  // ドリフト走行中の残りガイドライン
   renderActiveDriftPath(ctx) {
     if (!this.car.isDrifting || !this.car.driftPath || this.car.driftIndex >= this.car.driftPath.length) return;
     ctx.save();
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.5)';
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
     ctx.lineWidth = 2.5;
     ctx.setLineDash([8, 6]);
 
@@ -1394,7 +1406,6 @@ class TougeGame {
     const pts = this.track.points;
     if (pts.length < 2) return;
 
-    // A. 道路の土台（路肩）
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
@@ -1404,12 +1415,10 @@ class TougeGame {
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // B. アスファルト
     ctx.strokeStyle = '#3e4641';
     ctx.lineWidth = this.track.roadWidth;
     ctx.stroke();
 
-    // C. センターライン
     ctx.save();
     ctx.setLineDash([30, 25]);
     ctx.strokeStyle = '#f5df4d';
@@ -1417,7 +1426,6 @@ class TougeGame {
     ctx.stroke();
     ctx.restore();
 
-    // D. 全周ガードレール（落下なし・安心設計）
     ctx.strokeStyle = '#e2ebe4';
     ctx.lineWidth = 4;
     for (let i = 0; i < this.track.segments.length; i++) {
@@ -1430,7 +1438,6 @@ class TougeGame {
       ctx.stroke();
     }
 
-    // E. スタート＆ゴールライン
     this.renderFinishLine(ctx, pts[0], this.track.segments[0], 'START');
     const lastIdx = this.track.segments.length - 1;
     this.renderFinishLine(ctx, pts[pts.length - 1], this.track.segments[lastIdx], 'FINISH');
@@ -1483,12 +1490,10 @@ class TougeGame {
     ctx.translate(car.x, car.y);
     ctx.rotate(car.angle);
 
-    // 影
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     safeRoundRect(ctx, -car.length/2 + 2, -car.width/2 + 3, car.length, car.width, 5);
     ctx.fill();
 
-    // メインボディ（白・イラスト調）
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#181818';
     ctx.lineWidth = 2.0;
@@ -1496,31 +1501,25 @@ class TougeGame {
     ctx.fill();
     ctx.stroke();
 
-    // カーボンボンネット（黒）
     ctx.fillStyle = '#222222';
     safeRoundRect(ctx, car.length * 0.08, -car.width * 0.38, car.length * 0.36, car.width * 0.76, 2.5);
     ctx.fill();
 
-    // フロントガラス（青）
     ctx.fillStyle = '#4fa3e3';
     safeRoundRect(ctx, -car.length * 0.18, -car.width * 0.34, car.length * 0.32, car.width * 0.68, 2.5);
     ctx.fill();
 
-    // ヘッドライト（黄）
     ctx.fillStyle = '#ffeb3b';
     ctx.fillRect(car.length * 0.44, -car.width * 0.42, 3.5, 5);
     ctx.fillRect(car.length * 0.44, car.width * 0.42 - 5, 3.5, 5);
 
-    // テールランプ（赤）
     ctx.fillStyle = '#ff1744';
     ctx.fillRect(-car.length * 0.48, -car.width * 0.38, 3, 5);
     ctx.fillRect(-car.length * 0.48, car.width * 0.4 - 5, 3, 5);
 
-    // リアウィング
     ctx.fillStyle = '#111';
     ctx.fillRect(-car.length * 0.46, -car.width * 0.44, 3.5, car.width * 0.88);
 
-    // ブースト中のかすかな光
     if (car.boostLevel >= 2) {
       ctx.strokeStyle = car.boostLevel === 3 ? '#ff1744' : '#ffea00';
       ctx.lineWidth = 2.5;
