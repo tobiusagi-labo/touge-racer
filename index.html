@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.8.2</div>
+        <div class="title-version">ver 0.8.3</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -546,13 +546,22 @@
    車両・操作パラメータ定数（ここを変更して挙動を自由に調整できます）
    ========================================================================== */
 const PHYSICS_CONFIG = {
-  // 車体旋回速度 (ラジアン/フレーム): 速度ベクトルより速く旋回してスリップ角を誘発
-  TURN_SPEED: 0.105,             // 約6.0度/フレーム (クイックなノーズの入り)
+  // 最高速度 (合成速度に必ず適用)
+  TOP_SPEED_STRAIGHT: 13.5,     // 直線ダッシュ時の最高速度
+  TOP_SPEED_DRIFT: 10.8,        // ドリフト中最高速度
+  DRIFT_MIN_SPEED_RATIO: 0.70,  // ドリフト中の速度下限比率 (最高速の70%を下回らない)
+
+  // 抵抗・減衰パラメータ
+  DRAG: 0.35,                   // 速度比例空気抵抗 (速いほど減速が強くなる)
+  SLIP_LOSS: 2.2,               // スリップ角によるエネルギー減衰率 (滑るほど速度が減る)
+  FRICTION: 0.985,              // 基本転がり摩擦
+
+  // 車体旋回速度 (ラジアン/フレーム)
+  TURN_SPEED: 0.105,             // 約6.0度/フレーム
 
   // 基本の横方向グリップ力 (0: 完全な氷 〜 1: 瞬時に止まる)
-  // 横速度の減衰計算: vLat *= (1 - currentGrip)
-  BASE_LATERAL_GRIP: 0.10,       // 基本グリップ力 (以前の半分程度で滑りやすく)
-  DRIFT_LATERAL_GRIP: 0.02,      // ドリフト中の横グリップ力 (非常に弱く氷のように滑る)
+  BASE_LATERAL_GRIP: 0.10,       // 基本グリップ力
+  DRIFT_LATERAL_GRIP: 0.02,      // ドリフト中の横グリップ力
 
   // 目標方位との角度差によるグリップ低下率 (角度差90度で基本値の30%に)
   ANGLE_GRIP_MIN_RATIO: 0.30,
@@ -564,17 +573,9 @@ const PHYSICS_CONFIG = {
   SLIP_ENTER_DEG: 12.0,          // 12度を超えたらドリフト突入
   SLIP_EXIT_DEG: 5.0,            // 5度を下回ったらドリフト脱出
 
-  // 推力・最高速度
-  ACCEL_POWER: 0.72,             // 毎フレームの加速推力 (車首方向)
-  TOP_SPEED_STRAIGHT: 13.5,     // 直線ダッシュ時の最高速度
-  TOP_SPEED_DRIFT: 11.0,        // ドリフト中最高速度
-  DRIFT_MIN_SPEED_RATIO: 0.80,  // ドリフト中に維持する速度比率 (最高速の80%程度は維持)
-
-  // 1回のダッシュ最大持続時間 (秒)
+  // 推力
+  ACCEL_POWER: 0.70,             // 加速推力
   DASH_MAX_DURATION: 1.5,       // 最大1.5秒で推力OFF
-
-  // 走行摩擦 (速度ベクトルにのみ作用し車首向きは変えない)
-  FRICTION: 0.990,              // 走行抵抗
 };
 
 window.onerror = function(msg, url, line) {
@@ -823,10 +824,12 @@ class SkidpadArea {
       const normalVel = car.vx * nx + car.vy * ny;
       if (normalVel > 0) {
         particles.addSparks(car.x, car.y, -nx, -ny);
-        car.vx -= normalVel * 1.3;
-        car.vy -= normalVel * 1.3;
-        car.vx *= 0.6;
-        car.vy *= 0.6;
+        // 法線成分を反転しつつ、速度全体を40%程度に減衰
+        const tangentX = car.vx - normalVel * nx;
+        const tangentY = car.vy - normalVel * ny;
+        car.vx = (tangentX - normalVel * 0.4 * nx) * 0.40;
+        car.vy = (tangentY - normalVel * 0.4 * ny) * 0.40;
+        car.speed = Math.hypot(car.vx, car.vy);
         if (car.isDrifting) car.endDrift();
       }
     }
@@ -909,7 +912,9 @@ class Car {
     this.angularVelocity = 0;
   }
 
-  update(gameMode, track, skidpad, particles) {
+  update(dt, gameMode, track, skidpad, particles) {
+    const safeDt = Math.min(1/30, Math.max(0.001, Number.isFinite(dt) ? dt : 1/60));
+
     // 安全検査：値が NaN または非有限の場合、直ちに正常値へロールバックしてドリフト解除
     if (!Number.isFinite(this.x) || !Number.isFinite(this.y) || 
         !Number.isFinite(this.vx) || !Number.isFinite(this.vy) || 
@@ -920,6 +925,7 @@ class Car {
       this.vx = this.lastSafe.vx;
       this.vy = this.lastSafe.vy;
       this.heading = this.lastSafe.heading;
+      this.speed = Math.hypot(this.vx, this.vy);
       this.endDrift();
       return;
     }
@@ -933,7 +939,7 @@ class Car {
 
     // 1回のダッシュの最大持続時間（1.5秒）チェック
     if (this.isAccelerating) {
-      this.dashTimer += 0.016;
+      this.dashTimer += safeDt;
       if (this.dashTimer >= PHYSICS_CONFIG.DASH_MAX_DURATION) {
         this.targetPos = null;
         this.isAccelerating = false;
@@ -959,8 +965,9 @@ class Car {
       } else {
         const targetHeading = Math.atan2(dy, dx);
         const diff = normalizeAngle(targetHeading - this.heading);
-        // 一定の旋回速度で向ける
-        this.angularVelocity = Math.sign(diff) * Math.min(Math.abs(diff), PHYSICS_CONFIG.TURN_SPEED);
+        // 一定の旋回速度で向ける (safeDt 比例)
+        const frameTurnSpeed = PHYSICS_CONFIG.TURN_SPEED * (safeDt / (1/60));
+        this.angularVelocity = Math.sign(diff) * Math.min(Math.abs(diff), frameTurnSpeed);
         this.heading = normalizeAngle(this.heading + this.angularVelocity);
       }
     }
@@ -1025,27 +1032,26 @@ class Car {
       }
     }
 
-    // 推力：車体の向きにかかる
+    // ブースト倍率と最高速
     const boostMult = 1.0 + (this.boostLevel - 1) * 0.35;
     const maxSpeed = (this.isDrifting ? PHYSICS_CONFIG.TOP_SPEED_DRIFT : PHYSICS_CONFIG.TOP_SPEED_STRAIGHT) * boostMult;
 
-    if (this.isAccelerating) {
+    // 4. 推力は、現在の速度が最高速の95%未満のときだけかける。それ以上のときは0にする
+    if (this.isAccelerating && this.speed < maxSpeed * 0.95) {
       const fX = Math.cos(this.heading);
       const fY = Math.sin(this.heading);
-      const fwdVel = this.vx * fX + this.vy * fY;
-
-      if (fwdVel < maxSpeed) {
-        this.vx += fX * PHYSICS_CONFIG.ACCEL_POWER;
-        this.vy += fY * PHYSICS_CONFIG.ACCEL_POWER;
-      }
+      const dtScale = safeDt / (1/60);
+      this.vx += fX * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
+      this.vy += fY * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
     }
 
-    // ドリフト中は速度を落としすぎない(最高速の80%程度を維持)
+    // 5. 「ドリフト中に速度を維持する」処理は、速度を増やす処理にせず、速度が最高速の70%を下回らないようにする下限としてだけ使う
     if (this.isDrifting) {
       const minDriftSpd = PHYSICS_CONFIG.TOP_SPEED_STRAIGHT * PHYSICS_CONFIG.DRIFT_MIN_SPEED_RATIO * boostMult;
-      if (this.speed > 1.0 && this.speed < minDriftSpd) {
-        this.vx *= 1.025;
-        this.vy *= 1.025;
+      if (this.speed > 0.1 && this.speed < minDriftSpd) {
+        const liftScale = minDriftSpd / this.speed;
+        this.vx *= liftScale;
+        this.vy *= liftScale;
       }
     }
 
@@ -1065,13 +1071,29 @@ class Car {
     this.vx = headX * vLong + normX * vLat;
     this.vy = headY * vLong + normY * vLat;
 
-    // 減速(ブレーキ/摩擦)は速度ベクトルにだけ作用させ、車体の向きは変えない
+    // 2. 速度に比例する抵抗 (v *= 1 - drag * dt)
+    const dragFactor = Math.max(0, 1.0 - PHYSICS_CONFIG.DRAG * safeDt);
+    this.vx *= dragFactor;
+    this.vy *= dragFactor;
+
+    // 3. スリップ角が大きいほど、速度を減らす (v *= 1 - slipLoss * sin(スリップ角) * dt)
+    const slipSin = Math.abs(Math.sin(this.slipAngle));
+    const slipLossFactor = Math.max(0, 1.0 - PHYSICS_CONFIG.SLIP_LOSS * slipSin * safeDt);
+    this.vx *= slipLossFactor;
+    this.vy *= slipLossFactor;
+
+    // 基本転がり摩擦 (減速/ブレーキは速度ベクトルにのみ作用)
     this.vx *= PHYSICS_CONFIG.FRICTION;
     this.vy *= PHYSICS_CONFIG.FRICTION;
 
-    this.x += this.vx;
-    this.y += this.vy;
+    // 1. 毎フレーム、速度ベクトルの大きさ(sqrt(vx²+vy²))に対して、最大速度でクランプする（合成速度全体）
     this.speed = Math.hypot(this.vx, this.vy);
+    if (this.speed > maxSpeed && this.speed > 0.0001) {
+      const clampScale = maxSpeed / this.speed;
+      this.vx *= clampScale;
+      this.vy *= clampScale;
+      this.speed = maxSpeed;
+    }
 
     // 速度が5px/s未満 (約0.083px/frame未満) になったら、速度と角速度を0にする
     if (this.speed < 0.083) {
@@ -1081,6 +1103,41 @@ class Car {
       this.angularVelocity = 0;
     }
 
+    // 7. 1フレームの移動量が壁の厚みを超えないように、移動と衝突判定を複数のサブステップに分割する
+    const frameDist = Math.hypot(this.vx, this.vy);
+    const maxStepDist = 4.0; // 1ステップ最大4px
+    const steps = Math.max(1, Math.ceil(frameDist / maxStepDist));
+    const stepDx = this.vx / steps;
+    const stepDy = this.vy / steps;
+
+    for (let s = 0; s < steps; s++) {
+      this.x += stepDx;
+      this.y += stepDy;
+
+      if (gameMode === 'TOUGE') {
+        this.checkTougeCollision(track, particles);
+      } else {
+        skidpad.checkCollision(this, particles);
+      }
+    }
+
+    // 9. 更新後にも NaN / 無限大チェック
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.y) || 
+        !Number.isFinite(this.vx) || !Number.isFinite(this.vy) || 
+        !Number.isFinite(this.heading)) {
+      console.error('[Car State Recovered] NaN/Infinite detected post-step. Restoring safe state.');
+      this.x = this.lastSafe.x;
+      this.y = this.lastSafe.y;
+      this.vx = this.lastSafe.vx;
+      this.vy = this.lastSafe.vy;
+      this.heading = this.lastSafe.heading;
+      this.speed = Math.hypot(this.vx, this.vy);
+      this.endDrift();
+      return;
+    }
+
+    this.speed = Math.hypot(this.vx, this.vy);
+
     if (this.speed > 1.2) {
       this.noCrashDistance += this.speed;
       if (this.boostLevel === 1 && this.noCrashDistance > 600) {
@@ -1088,12 +1145,6 @@ class Car {
       } else if (this.boostLevel === 2 && this.noCrashDistance > 1600) {
         this.boostLevel = 3;
       }
-    }
-
-    if (gameMode === 'TOUGE') {
-      this.checkTougeCollision(track, particles);
-    } else {
-      skidpad.checkCollision(this, particles);
     }
   }
 
@@ -1124,10 +1175,12 @@ class Car {
 
       if (normalVel > 0) {
         particles.addSparks(this.x, this.y, -nx, -ny);
-        this.vx -= normalVel * 1.3;
-        this.vy -= normalVel * 1.3;
-        this.vx *= 0.55;
-        this.vy *= 0.55;
+        // 壁に当たったときは、速度の法線成分を反転しつつ、速度を40%程度に減衰させる
+        const tangentX = this.vx - normalVel * nx;
+        const tangentY = this.vy - normalVel * ny;
+        this.vx = (tangentX - normalVel * 0.4 * nx) * 0.40;
+        this.vy = (tangentY - normalVel * 0.4 * ny) * 0.40;
+        this.speed = Math.hypot(this.vx, this.vy);
         this.boostLevel = 1;
         this.noCrashDistance = 0;
 
@@ -1298,6 +1351,7 @@ class TougeGame {
     this.elapsedTime = 0;
     this.bestTime = localStorage.getItem('touge_best_time') || null;
     this.maxComboAchieved = 0;
+    this.lastFrameTime = performance.now();
 
     this.initEvents();
     this.resize();
@@ -1516,6 +1570,7 @@ class TougeGame {
 
   startRace() {
     this.startTime = performance.now();
+    this.lastFrameTime = this.startTime;
     this.elapsedTime = 0;
     this.maxComboAchieved = 0;
     this.applyModeSpawn();
@@ -1602,12 +1657,19 @@ class TougeGame {
   }
 
   update() {
+    const now = performance.now();
     if (this.appState === 'TITLE') {
       this.drawTitleHero();
+      this.lastFrameTime = now;
       return;
     }
 
-    this.car.update(this.gameMode, this.track, this.skidpad, this.particles);
+    const rawDt = this.lastFrameTime ? (now - this.lastFrameTime) / 1000 : 1/60;
+    this.lastFrameTime = now;
+    // 6. dtは最大で1/30秒に制限する (1/30〜0.001)
+    const dt = Math.min(1/30, Math.max(0.001, rawDt));
+
+    this.car.update(dt, this.gameMode, this.track, this.skidpad, this.particles);
     this.particles.update();
     this.updateHUD();
 
