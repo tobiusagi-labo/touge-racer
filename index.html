@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.8.5</div>
+        <div class="title-version">ver 0.8.6</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -548,39 +548,32 @@
 const PHYSICS_CONFIG = {
   // 最高速度 (合成速度に必ず適用)
   TOP_SPEED_STRAIGHT: 13.5,     // 直線ダッシュ時の最高速度
-  TOP_SPEED_DRIFT: 10.8,        // ドリフト中最高速度
+  TOP_SPEED_DRIFT: 12.0,        // ドリフト中最高速度
 
-  // 抵抗・減衰パラメータ
-  DRAG: 0.35,                   // 速度比例空気抵抗 (速いほど減速が強くなる)
-  SLIP_LOSS: 2.2,               // スリップ角によるエネルギー減衰率 (滑るほど速度が減る)
+  // アーケード方式ドリフト制御定数
+  DRIFT_ROTATION_SPEED: 2.5,    // 速度ベクトルの旋回角速度 (rad/s, 初期値2.5)
+  DRIFT_BODY_LEAD_DEG: 30.0,    // 速度方向に対して旋回方向へ先行させる車首ドリフト角 (度)
+  DRIFT_EXIT_ANGLE_DIFF_DEG: 8.0,// 速度方向と目標方位の差がこれ以内になったらドリフト終了 (度)
+  DRIFT_SAFETY_MAX_SEC: 2.0,    // ドリフトの最大安全タイマー (秒, 最大2秒で強制終了)
+  DRIFT_ACCEL_RATIO: 0.40,      // ドリフト中の推力割合 (通常の40%)
+  DRIFT_RECOVER_DURATION: 0.20, // ドリフト終了時に車体を速度方向へ戻す復帰時間 (秒)
+  DRIFT_COOLDOWN_DURATION: 0.20,// ドリフト終了後のクールダウン (秒)
+  DRIFT_SLIP_DECEL: 0.12,       // ドリフト中の軽いスリップ減速係数
+
+  // タップ操作・ドリフト発動定数
+  TAP_MAX_ANGLE_DEG: 125.0,     // タップの有効範囲 (正面から左右125度、合計250度)
+  DRIFT_TRIGGER_ANGLE_DEG: 20.0,// ドリフト判定しきい値 (20度超でドリフト、20度以内は直進ダッシュ)
+
+  // 抵抗・減衰パラメータ (通常時)
+  DRAG: 0.35,                   // 速度比例空気抵抗
+  SLIP_LOSS: 2.2,               // 通常時のスリップ角によるエネルギー減衰率
   FRICTION: 0.985,              // 基本転がり摩擦
 
-  // 車体旋回速度 (ラジアン/フレーム)
-  TURN_SPEED: 0.105,             // 約6.0度/フレーム (通常時)
-  DRIFT_TURN_MULT: 1.3,         // ドリフト中の旋回速度倍率 (通常時の1.3倍で小さく曲がれる)
+  // 車体旋回速度 (通常時: ラジアン/フレーム)
+  TURN_SPEED: 0.105,             // 約6.0度/フレーム
 
-  // ドリフト持続時間 & クールダウン (秒)
-  DRIFT_MAX_DURATION: 0.7,      // ドリフト最大継続時間 (最大0.7秒で強制解除)
-  DRIFT_COOLDOWN_DURATION: 0.2, // ドリフト終了後のクールダウン (0.2秒間は再突入不可)
-
-  // ドリフト中のグリップ復元パラメータ (基本値に対する比率)
-  DRIFT_GRIP_START_RATIO: 0.40, // ドリフト開始時のグリップ比率 (基本値の40%)
-  DRIFT_GRIP_END_RATIO: 1.00,   // ドリフト終了時のグリップ比率 (基本値の100%へ滑らかに戻す)
-
-  // 横方向グリップ力 (0: 完全な氷 〜 1: 瞬時に止まる)
+  // 横方向グリップ力 (通常直進時: 0: 完全な氷 〜 1: 瞬時に止まる)
   BASE_LATERAL_GRIP: 0.17,       // 基本の横グリップ
-
-  // 目標方位との角度差によるグリップ制御定数
-  GRIP_ANGLE_FULL_DEG: 10.0,     // 10度未満ならグリップ最大 (1.0)
-  GRIP_ANGLE_MIN_DEG: 90.0,      // 90度以上で最小比率へ
-  GRIP_ANGLE_MIN_RATIO: 0.50,    // 90度時のグリップ比率 (基本値の50%)
-
-  // 速度によるグリップ低下率 (最高速のときに基本値の80%まで)
-  SPEED_GRIP_MIN_RATIO: 0.80,
-
-  // スリップ角ヒステリシス (度)
-  SLIP_ENTER_DEG: 18.0,          // 18度を超えたらドリフト突入
-  SLIP_EXIT_DEG: 8.0,            // 8度を下回ったらドリフト脱出
 
   // 直進時の車体向き補正率 (舵を切っていない間に進行方向へ寄せる割合: 毎フレーム10%程度)
   ALIGN_TO_VELOCITY_RATE: 0.10,
@@ -880,9 +873,12 @@ class Car {
     this.length = 38;
 
     this.targetPos = null;        // タップされた目標地点 { x, y }
+    this.targetHeading = 0;       // 目標方位
     this.isAccelerating = false;  // 推力ONフラグ
     this.isDrifting = false;
+    this.driftTurnSign = 1;       // ドリフト旋回方向 (+1: 右, -1: 左)
     this.driftTimer = 0;          // ドリフト継続タイマー
+    this.driftRecoverTimer = 0;   // ドリフト終了時の復帰タイマー (約0.2秒)
     this.driftCooldownTimer = 0;  // ドリフト再突入クールダウンタイマー
     this.slipAngle = 0;           // スリップ角 (ラジアン)
     this.angularVelocity = 0;     // 旋回角速度
@@ -908,9 +904,43 @@ class Car {
   // 1. pointerdown の瞬間に1回だけ設定し、ダッシュ開始
   setTarget(targetX, targetY) {
     if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
-    this.targetPos = { x: targetX, y: targetY };
+
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    const rawTargetHeading = Math.atan2(dy, dx);
+    const rawDiff = normalizeAngle(rawTargetHeading - this.heading);
+
+    // タップの有効範囲を、車の正面から左右125度(合計250度)に広げる
+    const maxAngleRad = PHYSICS_CONFIG.TAP_MAX_ANGLE_DEG * (Math.PI / 180);
+    let clampedDiff = rawDiff;
+    if (Math.abs(rawDiff) > maxAngleRad) {
+      // 範囲外のタップは無視せず、範囲の端の方向に丸めて目標にする
+      clampedDiff = Math.sign(rawDiff) * maxAngleRad;
+    }
+
+    const finalTargetHeading = normalizeAngle(this.heading + clampedDiff);
+    const dist = Math.hypot(dx, dy);
+
+    this.targetHeading = finalTargetHeading;
+    this.targetPos = {
+      x: this.x + Math.cos(finalTargetHeading) * dist,
+      y: this.y + Math.sin(finalTargetHeading) * dist
+    };
     this.isAccelerating = true;
     this.dashTimer = 0;
+
+    // 角度差が小さいタップ(20度以内)は、ドリフトに入らず、通常のダッシュとして処理する
+    const diffDeg = Math.abs(clampedDiff) * (180 / Math.PI);
+    if (diffDeg > PHYSICS_CONFIG.DRIFT_TRIGGER_ANGLE_DEG && this.driftCooldownTimer <= 0) {
+      this.isDrifting = true;
+      this.driftTurnSign = Math.sign(clampedDiff) || 1;
+      this.driftTimer = 0;
+      this.driftRecoverTimer = 0;
+    } else {
+      if (this.isDrifting) {
+        this.endDriftWithRecovery();
+      }
+    }
   }
 
   // 推力OFF
@@ -923,9 +953,20 @@ class Car {
   endDrift() {
     this.isDrifting = false;
     this.driftTimer = 0;
+    this.driftRecoverTimer = 0;
     this.driftCooldownTimer = PHYSICS_CONFIG.DRIFT_COOLDOWN_DURATION;
     this.slipAngle = 0;
     this.angularVelocity = 0;
+  }
+
+  endDriftWithRecovery() {
+    if (this.isDrifting) {
+      this.isDrifting = false;
+      this.driftTimer = 0;
+      this.driftRecoverTimer = PHYSICS_CONFIG.DRIFT_RECOVER_DURATION;
+      this.driftCooldownTimer = PHYSICS_CONFIG.DRIFT_COOLDOWN_DURATION;
+      this.angularVelocity = 0;
+    }
   }
 
   update(dt, gameMode, track, skidpad, particles) {
@@ -968,159 +1009,157 @@ class Car {
       this.driftCooldownTimer = Math.max(0, this.driftCooldownTimer - safeDt);
     }
 
-    // ドリフト状態の持続時間更新と強制解除チェック (最大0.7秒)
-    if (this.isDrifting) {
-      this.driftTimer += safeDt;
-      if (this.driftTimer >= PHYSICS_CONFIG.DRIFT_MAX_DURATION) {
-        this.endDrift();
-      }
-    }
-
-    // 2. 目標地点の近く(40px以内)に着いた、または目標を通り過ぎた(目標が車の後方になった)ら目標破棄
-    let targetAngleDiffDeg = 0;
-    if (this.targetPos) {
-      const dx = this.targetPos.x - this.x;
-      const dy = this.targetPos.y - this.y;
-      const dist = Math.hypot(dx, dy);
-
-      const headX = Math.cos(this.heading);
-      const headY = Math.sin(this.heading);
-      const forwardDot = dx * headX + dy * headY;
-
-      // 40px以内、または目標が車の真横〜後方になったら到達・通過と判定
-      if (dist < 40 || forwardDot < -4) {
-        this.targetPos = null;
-        this.isAccelerating = false;
-        this.angularVelocity = 0;
-      } else {
-        const targetHeading = Math.atan2(dy, dx);
-        const diff = normalizeAngle(targetHeading - this.heading);
-        targetAngleDiffDeg = Math.abs(diff) * (180 / Math.PI);
-        // ドリフト中の車体の旋回速度を通常時の1.3倍にして小さく曲がれるようにする
-        const turnMult = this.isDrifting ? PHYSICS_CONFIG.DRIFT_TURN_MULT : 1.0;
-        const frameTurnSpeed = PHYSICS_CONFIG.TURN_SPEED * turnMult * (safeDt / (1/60));
-        this.angularVelocity = Math.sign(diff) * Math.min(Math.abs(diff), frameTurnSpeed);
-        this.heading = normalizeAngle(this.heading + this.angularVelocity);
-      }
-    }
-
-    // 推力がない間は、角速度を減衰させる (ドリフト中は弱め、通常時は大きめに減衰)
-    if (!this.isAccelerating) {
-      const decay = this.isDrifting ? 0.95 : 0.85;
-      this.angularVelocity *= decay;
-      if (Math.abs(this.angularVelocity) < 0.001) this.angularVelocity = 0;
-      this.heading = normalizeAngle(this.heading + this.angularVelocity);
-    }
-
-    // 舵を切っていない間(目標がないとき、または角度差が10度未満のとき)は、車体の向きを速度ベクトルの方向へ、毎フレーム少しずつ(10%程度)寄せる
-    const isNotSteering = !this.targetPos || targetAngleDiffDeg < PHYSICS_CONFIG.GRIP_ANGLE_FULL_DEG;
-    if (isNotSteering && this.speed > 0.5) {
-      const moveAngle = Math.atan2(this.vy, this.vx);
-      const alignDiff = normalizeAngle(moveAngle - this.heading);
-      const alignFactor = Math.min(1.0, PHYSICS_CONFIG.ALIGN_TO_VELOCITY_RATE * (safeDt / (1/60)));
-      this.heading = normalizeAngle(this.heading + alignDiff * alignFactor);
-    }
-
-    this.speed = Math.hypot(this.vx, this.vy);
-    const moveAngle = this.speed > 0.05 ? Math.atan2(this.vy, this.vx) : this.heading;
-
-    // 速度が最高速の10%未満のときは、スリップ角を計算せず、グリップ係数を最大にして、ドリフト状態を解除する
-    const minDriftThresholdSpeed = PHYSICS_CONFIG.TOP_SPEED_STRAIGHT * 0.10;
-    let currentGripPower;
-
-    if (this.speed < minDriftThresholdSpeed) {
-      this.slipAngle = 0;
-      if (this.isDrifting) this.endDrift();
-      currentGripPower = 1.0; // グリップ最大 (横滑りを完全ゼロに抑える)
-    } else {
-      this.slipAngle = normalizeAngle(this.heading - moveAngle);
-      const slipAngleDeg = Math.abs(this.slipAngle) * (180 / Math.PI);
-
-      // ドリフト状態の判定 (クールダウン0以下で18度超なら突入、8度未満なら脱出)
-      if (!this.isDrifting && this.driftCooldownTimer <= 0 && slipAngleDeg > PHYSICS_CONFIG.SLIP_ENTER_DEG) {
-        this.isDrifting = true;
-        this.driftTimer = 0;
-      } else if (this.isDrifting && slipAngleDeg < PHYSICS_CONFIG.SLIP_EXIT_DEG) {
-        this.endDrift();
-      }
-
-      if (this.isDrifting) {
-        // ドリフト中は、経過時間に応じてグリップを基本値の40%から100%へ滑らかに戻していく (終盤にかけて上げる)
-        const tDrift = Math.min(1.0, this.driftTimer / PHYSICS_CONFIG.DRIFT_MAX_DURATION);
-        const smoothDriftT = tDrift * tDrift * (3 - 2 * tDrift);
-        const gripRatio = PHYSICS_CONFIG.DRIFT_GRIP_START_RATIO + 
-          (PHYSICS_CONFIG.DRIFT_GRIP_END_RATIO - PHYSICS_CONFIG.DRIFT_GRIP_START_RATIO) * smoothDriftT;
-        currentGripPower = PHYSICS_CONFIG.BASE_LATERAL_GRIP * gripRatio;
-
-        particles.addSkidMark(this.x, this.y, this.heading, this.width);
-        particles.addSmoke(this.x, this.y, this.heading, this.width);
-      } else {
-        // グリップ走行中
-        if (isNotSteering) {
-          // 目標方位との角度差が10度未満（または目標なし）のときは、グリップを最大にする
-          currentGripPower = 1.0;
-        } else {
-          // 10度から90度の間は、角度差に応じて基本値の100%から50%まで滑らかに下げる (smoothstep)
-          let grip = PHYSICS_CONFIG.BASE_LATERAL_GRIP;
-
-          const t = Math.min(1.0, Math.max(0, (targetAngleDiffDeg - PHYSICS_CONFIG.GRIP_ANGLE_FULL_DEG) / (PHYSICS_CONFIG.GRIP_ANGLE_MIN_DEG - PHYSICS_CONFIG.GRIP_ANGLE_FULL_DEG)));
-          const smoothT = t * t * (3 - 2 * t);
-          const angleFactor = 1.0 - (1.0 - PHYSICS_CONFIG.GRIP_ANGLE_MIN_RATIO) * smoothT;
-          grip *= angleFactor;
-
-          // 速度によるグリップ低下: 最高速のときに基本値の80%まで (従来の60%から弱める)
-          const speedRatio = Math.min(1.0, this.speed / PHYSICS_CONFIG.TOP_SPEED_STRAIGHT);
-          const speedFactor = 1.0 - (1.0 - PHYSICS_CONFIG.SPEED_GRIP_MIN_RATIO) * speedRatio;
-          grip *= speedFactor;
-
-          currentGripPower = grip;
-        }
-      }
-    }
-
     // ブースト倍率と最高速
     const boostMult = 1.0 + (this.boostLevel - 1) * 0.35;
     const maxSpeed = (this.isDrifting ? PHYSICS_CONFIG.TOP_SPEED_DRIFT : PHYSICS_CONFIG.TOP_SPEED_STRAIGHT) * boostMult;
+    this.speed = Math.hypot(this.vx, this.vy);
 
-    // ドリフト状態の間は推力を0にする(惰性だけで進む)。ドリフトから抜けたら推力を元に戻す
-    if (this.isAccelerating && !this.isDrifting && this.speed < maxSpeed * 0.95) {
-      const fX = Math.cos(this.heading);
-      const fY = Math.sin(this.heading);
-      const dtScale = safeDt / (1/60);
-      this.vx += fX * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
-      this.vy += fY * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
+    if (this.isDrifting) {
+      // =========================================================================
+      // アーケード方式ドリフト
+      // 速度ベクトルの方向を一定角速度(2.5 rad/s)で目標方位へ回し、車首は30度先行
+      // =========================================================================
+      this.driftTimer += safeDt;
+
+      // 速度ベクトルの進行方向 (速度が小さすぎる場合は車首方向)
+      let moveAngle = this.speed > 0.05 ? Math.atan2(this.vy, this.vx) : this.heading;
+
+      // 目標方位
+      let currentTargetHeading = this.targetHeading;
+      if (this.targetPos) {
+        const dx = this.targetPos.x - this.x;
+        const dy = this.targetPos.y - this.y;
+        currentTargetHeading = Math.atan2(dy, dx);
+      }
+
+      const diffToTarget = normalizeAngle(currentTargetHeading - moveAngle);
+      const absDiffDeg = Math.abs(diffToTarget) * (180 / Math.PI);
+
+      // ドリフト終了条件: 速度方向と目標方位の差が8度以内、または安全装置(最大2秒)
+      if (absDiffDeg <= PHYSICS_CONFIG.DRIFT_EXIT_ANGLE_DIFF_DEG || this.driftTimer >= PHYSICS_CONFIG.DRIFT_SAFETY_MAX_SEC) {
+        this.endDriftWithRecovery();
+      } else {
+        // 1. 速度ベクトルの方向を目標方位へ一定の角速度(初期値2.5 rad/s)で回す
+        const turnStep = Math.sign(diffToTarget) * Math.min(Math.abs(diffToTarget), PHYSICS_CONFIG.DRIFT_ROTATION_SPEED * safeDt);
+        moveAngle = normalizeAngle(moveAngle + turnStep);
+
+        // 2. スリップによる減速だけを軽く加える
+        const slipDecay = Math.max(0, 1.0 - PHYSICS_CONFIG.DRIFT_SLIP_DECEL * safeDt);
+        this.speed *= slipDecay;
+
+        // 3. ドリフト中の推力は通常の40%
+        if (this.isAccelerating && this.speed < maxSpeed * 0.95) {
+          const dtScale = safeDt / (1/60);
+          this.speed += PHYSICS_CONFIG.ACCEL_POWER * PHYSICS_CONFIG.DRIFT_ACCEL_RATIO * dtScale;
+        }
+
+        // 速度ベクトルを旋回後の角度と大きさで再構成
+        this.vx = Math.cos(moveAngle) * this.speed;
+        this.vy = Math.sin(moveAngle) * this.speed;
+
+        // 4. 車体の向きは、速度方向に対して旋回方向へ30度先行させ、補間で滑らかに追従
+        const leadRad = PHYSICS_CONFIG.DRIFT_BODY_LEAD_DEG * (Math.PI / 180);
+        const targetBodyAngle = normalizeAngle(moveAngle + Math.sign(diffToTarget) * leadRad);
+        const bodyDiff = normalizeAngle(targetBodyAngle - this.heading);
+        this.heading = normalizeAngle(this.heading + bodyDiff * Math.min(1.0, 16.0 * safeDt));
+
+        this.slipAngle = normalizeAngle(this.heading - moveAngle);
+
+        particles.addSkidMark(this.x, this.y, this.heading, this.width);
+        particles.addSmoke(this.x, this.y, this.heading, this.width);
+      }
+    } else {
+      // =========================================================================
+      // 通常走行（グリップ・直進ダッシュ）
+      // =========================================================================
+      let targetAngleDiffDeg = 0;
+
+      // 目標地点の到達・通過チェック（通常時のみ破棄）
+      if (this.targetPos) {
+        const dx = this.targetPos.x - this.x;
+        const dy = this.targetPos.y - this.y;
+        const dist = Math.hypot(dx, dy);
+
+        const headX = Math.cos(this.heading);
+        const headY = Math.sin(this.heading);
+        const forwardDot = dx * headX + dy * headY;
+
+        if (dist < 40 || forwardDot < -4) {
+          this.targetPos = null;
+          this.isAccelerating = false;
+          this.angularVelocity = 0;
+        } else {
+          const targetHeading = Math.atan2(dy, dx);
+          const diff = normalizeAngle(targetHeading - this.heading);
+          targetAngleDiffDeg = Math.abs(diff) * (180 / Math.PI);
+
+          const frameTurnSpeed = PHYSICS_CONFIG.TURN_SPEED * (safeDt / (1/60));
+          this.angularVelocity = Math.sign(diff) * Math.min(Math.abs(diff), frameTurnSpeed);
+          this.heading = normalizeAngle(this.heading + this.angularVelocity);
+        }
+      }
+
+      // ドリフト終了時の復帰中（約0.2秒かけて車体の向きを速度方向へ戻す）
+      if (this.driftRecoverTimer > 0) {
+        this.driftRecoverTimer -= safeDt;
+        if (this.speed > 0.5) {
+          const moveAngle = Math.atan2(this.vy, this.vx);
+          const alignDiff = normalizeAngle(moveAngle - this.heading);
+          const recoverFactor = Math.min(1.0, safeDt / Math.max(0.01, this.driftRecoverTimer + safeDt * 0.5));
+          this.heading = normalizeAngle(this.heading + alignDiff * recoverFactor);
+        }
+        this.angularVelocity = 0;
+        this.slipAngle = 0;
+      } else if (!this.isAccelerating) {
+        // 推力がない間の角速度減衰
+        this.angularVelocity *= 0.85;
+        if (Math.abs(this.angularVelocity) < 0.001) this.angularVelocity = 0;
+        this.heading = normalizeAngle(this.heading + this.angularVelocity);
+      }
+
+      // 舵を切っていない間の進行方向へのセルフアライニング
+      const isNotSteering = !this.targetPos || targetAngleDiffDeg < 10.0;
+      if (isNotSteering && this.speed > 0.5 && this.driftRecoverTimer <= 0) {
+        const moveAngle = Math.atan2(this.vy, this.vx);
+        const alignDiff = normalizeAngle(moveAngle - this.heading);
+        const alignFactor = Math.min(1.0, PHYSICS_CONFIG.ALIGN_TO_VELOCITY_RATE * (safeDt / (1/60)));
+        this.heading = normalizeAngle(this.heading + alignDiff * alignFactor);
+      }
+
+      // 通常時の推力（100%）
+      if (this.isAccelerating && this.speed < maxSpeed * 0.95) {
+        const fX = Math.cos(this.heading);
+        const fY = Math.sin(this.heading);
+        const dtScale = safeDt / (1/60);
+        this.vx += fX * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
+        this.vy += fY * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
+      }
+
+      // 通常時の横方向グリップ（復帰中は1.0でスピンや急変を防止）
+      let currentGripPower = 1.0;
+      if (this.driftRecoverTimer <= 0 && !isNotSteering) {
+        currentGripPower = PHYSICS_CONFIG.BASE_LATERAL_GRIP;
+      }
+
+      const headX = Math.cos(this.heading);
+      const headY = Math.sin(this.heading);
+      const normX = -headY;
+      const normY = headX;
+
+      let vLong = this.vx * headX + this.vy * headY;
+      let vLat = this.vx * normX + this.vy * normY;
+      vLat *= Math.max(0, 1.0 - currentGripPower);
+
+      this.vx = headX * vLong + normX * vLat;
+      this.vy = headY * vLong + normY * vLat;
+
+      // 抵抗・摩擦
+      const dragFactor = Math.max(0, 1.0 - PHYSICS_CONFIG.DRAG * safeDt);
+      this.vx *= dragFactor;
+      this.vy *= dragFactor;
+      this.vx *= PHYSICS_CONFIG.FRICTION;
+      this.vy *= PHYSICS_CONFIG.FRICTION;
     }
-
-    // 速度ベクトルを車体の向きの成分(前後)と横向きの成分に分け、横成分をグリップ係数で減衰させる
-    const headX = Math.cos(this.heading);
-    const headY = Math.sin(this.heading);
-    const normX = -headY;
-    const normY = headX;
-
-    let vLong = this.vx * headX + this.vy * headY;
-    let vLat = this.vx * normX + this.vy * normY;
-
-    // 横成分の減衰 (currentGripPower: 0で完全維持・氷 〜 1で横滑りゼロ)
-    const latRetention = Math.max(0, 1.0 - currentGripPower);
-    vLat *= latRetention;
-
-    this.vx = headX * vLong + normX * vLat;
-    this.vy = headY * vLong + normY * vLat;
-
-    // 2. 速度に比例する抵抗 (v *= 1 - drag * dt)
-    const dragFactor = Math.max(0, 1.0 - PHYSICS_CONFIG.DRAG * safeDt);
-    this.vx *= dragFactor;
-    this.vy *= dragFactor;
-
-    // 3. スリップ角が大きいほど、速度を減らす (v *= 1 - slipLoss * sin(スリップ角) * dt)
-    const slipSin = Math.abs(Math.sin(this.slipAngle));
-    const slipLossFactor = Math.max(0, 1.0 - PHYSICS_CONFIG.SLIP_LOSS * slipSin * safeDt);
-    this.vx *= slipLossFactor;
-    this.vy *= slipLossFactor;
-
-    // 基本転がり摩擦 (減速/ブレーキは速度ベクトルにのみ作用)
-    this.vx *= PHYSICS_CONFIG.FRICTION;
-    this.vy *= PHYSICS_CONFIG.FRICTION;
 
     // 1. 毎フレーム、速度ベクトルの大きさ(sqrt(vx²+vy²))に対して、最大速度でクランプする（合成速度全体）
     this.speed = Math.hypot(this.vx, this.vy);
@@ -1533,12 +1572,12 @@ class TougeGame {
       this.timerLabel.textContent = 'FREE TEST';
       this.bestDisplay.textContent = '広場練習中';
       this.restartBtn.textContent = '位置リセット';
-      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで旋回＆加速！<br>・角度差18°以上でドリフト！';
+      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで旋回＆加速！<br>・角度差20°以上でアーケードドリフト！';
     } else {
       this.timerLabel.textContent = 'TIME ATTACK';
       this.bestDisplay.textContent = this.bestTime ? `BEST: ${this.formatTime(this.bestTime)}` : 'BEST: --:--.--';
       this.restartBtn.textContent = 'リスタート';
-      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差18°以上でドリフト！';
+      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差20°以上でアーケードドリフト！';
     }
   }
 
