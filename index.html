@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.7.0</div>
+        <div class="title-version">ver 0.8.0</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -485,7 +485,7 @@
           <button class="mode-opt-btn" id="btnTitleModeTouge" type="button">🏁 峠アタック</button>
         </div>
         <div class="mode-desc-text" id="titleModeDesc">
-          タップで即ダッシュ！画面をなぞって豪快にスライドドリフト！
+          タップした方向へ旋回＆加速！急なハンドル操作で豪快ドリフト！
         </div>
       </div>
 
@@ -517,8 +517,8 @@
       <div class="hud-bottom">
         <div class="guide-tip" id="guideTip">
           <strong>🎮 操作</strong><br>
-          ・タップで即ダッシュ！<br>
-          ・なぞってスライドドリフト！
+          ・タップした方向へ旋回＆加速！<br>
+          ・角度差20°以上でドリフト！
         </div>
         <div class="hud-bottom-right">
           <button class="action-btn" id="restartBtn" type="button">位置リセット</button>
@@ -542,6 +542,31 @@
 </div>
 
 <script>
+/* ==========================================================================
+   車両・操作パラメータ定数（ここを変更して挙動を自由に調整できます）
+   ========================================================================== */
+const PHYSICS_CONFIG = {
+  // 旋回速度 (ラジアン/フレーム): 車体をタップ方向へ向ける旋回力
+  TURN_SPEED: 0.082,             // 約4.7度/フレーム
+
+  // グリップ係数 (毎フレーム、横方向速度にかける減衰率: 0〜1)
+  // 小さいほど横滑りがすぐ止まり(グリップ走行)、大きいほど滑り続ける
+  NORMAL_GRIP: 0.82,            // 通常時の強いグリップ (横滑りを素早く収束)
+  DRIFT_GRIP: 0.955,            // ドリフト時の低いグリップ (滑らかに横滑り)
+
+  // スリップ角のしきい値 (度): 車体向きと進行方向の差がこれを超えるとドリフト
+  SLIP_ANGLE_THRESHOLD_DEG: 20, // 20度
+
+  // 推力・最高速度
+  ACCEL_POWER: 0.70,            // 毎フレームの加速推力 (車首方向)
+  TOP_SPEED_STRAIGHT: 13.5,     // 直線ダッシュ時の最高速度
+  TOP_SPEED_DRIFT: 10.8,        // ドリフト中の最高速度 (直線の80%程度)
+  DRIFT_MIN_SPEED_RATIO: 0.80,  // ドリフト中に維持する速度比率 (ダッシュ速度の80%程度は維持)
+
+  // 走行摩擦
+  FRICTION: 0.99,               // 走行抵抗
+};
+
 window.onerror = function(msg, url, line) {
   const eb = document.getElementById('errorBanner');
   if (eb) {
@@ -807,13 +832,12 @@ class Car {
     this.startY = startY;
     this.startAngle = startAngle;
 
-    // 直前の正常値キャッシュ (NaN 発生時のロールバック用)
     this.lastSafe = {
       x: startX,
       y: startY,
       vx: 0,
       vy: 0,
-      angle: startAngle
+      heading: startAngle
     };
 
     this.reset();
@@ -824,118 +848,62 @@ class Car {
     this.y = Number.isFinite(y) ? y : 0;
     this.vx = 0;
     this.vy = 0;
-    this.angle = Number.isFinite(angle) ? normalizeAngle(angle) : 0;
+    this.heading = Number.isFinite(angle) ? normalizeAngle(angle) : 0;
     this.speed = 0;
 
     this.width = 20;
     this.length = 38;
 
-    this.angularVelocity = 0;
-    this.steerInput = 0;
+    this.targetPos = null;        // タップされた目標地点 { x, y }
+    this.isAccelerating = false;  // タップ中（推力ON）フラグ
     this.isDrifting = false;
-    this.isFingerDown = false;
-    this.steerFadeFrames = 0;
+    this.slipAngle = 0;           // スリップ角 (ラジアン)
 
     this.currentSegIndex = 0;
     this.noCrashDistance = 0;
     this.boostLevel = 1;
-    this.dashPowerBase = 12.0;
 
     this.lastSafe = {
       x: this.x,
       y: this.y,
       vx: 0,
       vy: 0,
-      angle: this.angle
+      heading: this.heading
     };
   }
 
-  // 1. pointerdownで、まずその地点へのダッシュを開始する
-  dashToward(targetX, targetY, track, gameMode) {
-    if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return false;
+  // 互換用 getter/setter
+  get angle() { return this.heading; }
+  set angle(v) { this.heading = v; }
 
-    let destX = targetX;
-    let destY = targetY;
-
-    if (gameMode === 'TOUGE' && track) {
-      const rel = track.getTrackRelationLocal(destX, destY, this.currentSegIndex);
-      const halfRoad = track.roadWidth / 2 - 12;
-      if (rel.minDist > halfRoad) {
-        const offX = destX - rel.proj.x;
-        const offY = destY - rel.proj.y;
-        const d = Math.hypot(offX, offY) || 0.001;
-        destX = rel.proj.x + (offX / d) * halfRoad;
-        destY = rel.proj.y + (offY / d) * halfRoad;
-      }
-    }
-
-    const dx = destX - this.x;
-    const dy = destY - this.y;
-    if (Math.hypot(dx, dy) < 6) return false;
-
-    this.angle = normalizeAngle(Math.atan2(dy, dx));
-    this.angularVelocity = 0;
-    this.steerInput = 0;
-    this.isDrifting = false;
-    this.isFingerDown = false;
-    this.steerFadeFrames = 0;
-
-    const boostMult = 1.0 + (this.boostLevel - 1) * 0.4;
-    const power = this.dashPowerBase * boostMult;
-
-    this.vx = Math.cos(this.angle) * power;
-    this.vy = Math.sin(this.angle) * power;
-    return true;
+  // タップされた地点を目標方位としてセット＆推力ON
+  setTarget(targetX, targetY) {
+    if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+    this.targetPos = { x: targetX, y: targetY };
+    this.isAccelerating = true;
   }
 
-  // ドリフトモード開始（ダッシュ目標破棄、曲率入力モードへ）
-  startCurvatureDrift() {
-    this.isDrifting = true;
-    this.isFingerDown = true;
-    this.steerFadeFrames = 10;
-
-    // ドリフト突入時のスピードブースト（現在のスピードを活かしつつ適度な加速）
-    const curSpd = Math.hypot(this.vx, this.vy);
-    const boostMult = 1.0 + (this.boostLevel - 1) * 0.35;
-    const power = Math.max(curSpd, this.dashPowerBase * 0.92 * boostMult);
-    this.vx = Math.cos(this.angle) * power;
-    this.vy = Math.sin(this.angle) * power;
-  }
-
-  // 指の曲率（曲がり具合）を旋回入力として更新
-  applyCurvature(curvature) {
-    if (!Number.isFinite(curvature)) return;
-    this.isFingerDown = true;
-    this.isDrifting = true;
-    // 曲率 (rad/px) に比例した角速度入力（スケール調整）
-    this.steerInput = curvature * 2.8;
-  }
-
-  // 指を離した時：旋回入力を約10フレームで0に戻す処理を開始
-  releaseFinger() {
-    this.isFingerDown = false;
-    this.steerFadeFrames = 10;
+  // タップを離した時（推力OFF）
+  stopAccelerating() {
+    this.isAccelerating = false;
   }
 
   endDrift() {
     this.isDrifting = false;
-    this.isFingerDown = false;
-    this.steerInput = 0;
-    this.steerFadeFrames = 0;
-    this.angularVelocity = 0;
+    this.slipAngle = 0;
   }
 
   update(gameMode, track, skidpad, particles) {
     // 安全検査：値が NaN または非有限の場合、直ちに正常値へロールバックしてドリフト解除
     if (!Number.isFinite(this.x) || !Number.isFinite(this.y) || 
         !Number.isFinite(this.vx) || !Number.isFinite(this.vy) || 
-        !Number.isFinite(this.angle)) {
+        !Number.isFinite(this.heading)) {
       console.error('[Car State Recovered] Invalid numeric values detected. Resetting to last safe state.');
       this.x = this.lastSafe.x;
       this.y = this.lastSafe.y;
       this.vx = this.lastSafe.vx;
       this.vy = this.lastSafe.vy;
-      this.angle = this.lastSafe.angle;
+      this.heading = this.lastSafe.heading;
       this.endDrift();
       return;
     }
@@ -945,91 +913,90 @@ class Car {
     this.lastSafe.y = this.y;
     this.lastSafe.vx = this.vx;
     this.lastSafe.vy = this.vy;
-    this.lastSafe.angle = this.angle;
+    this.lastSafe.heading = this.heading;
 
-    this.speed = Math.hypot(this.vx, this.vy);
-    const moveAngle = this.speed > 0.05 ? Math.atan2(this.vy, this.vx) : this.angle;
-
-    // ドリフト制御
-    if (this.isDrifting) {
-      // 6. 指を離したら、旋回入力を約10フレームで0に戻す
-      if (!this.isFingerDown) {
-        if (this.steerFadeFrames > 0) {
-          this.steerFadeFrames--;
-          this.steerInput *= (this.steerFadeFrames / 10);
-        } else {
-          this.steerInput = 0;
-          this.isDrifting = false;
-        }
-      }
-
-      // 5. 旋回の角速度に上限を設け、横滑り角は45度で制限する
-      const maxAngularVel = 0.082; // 約4.7度/フレーム
-      const targetAngularVel = Math.max(-maxAngularVel, Math.min(maxAngularVel, this.steerInput));
-      this.angularVelocity = this.angularVelocity * 0.6 + targetAngularVel * 0.4;
-      this.angle = normalizeAngle(this.angle + this.angularVelocity);
-
-      // 横滑り角の45度制限
-      let slipAngle = normalizeAngle(this.angle - moveAngle);
-      const maxSlip = Math.PI / 4; // 45度
-      if (slipAngle > maxSlip) {
-        this.angle = normalizeAngle(moveAngle + maxSlip);
-        this.angularVelocity = 0;
-      } else if (slipAngle < -maxSlip) {
-        this.angle = normalizeAngle(moveAngle - maxSlip);
-        this.angularVelocity = 0;
-      }
-
-      // 推進力：車首方向へ適度に力を分散
-      const forwardX = Math.cos(this.angle);
-      const forwardY = Math.sin(this.angle);
-      const targetSpd = Math.max(5.8, this.speed * 0.985);
-      this.vx = this.vx * 0.88 + forwardX * targetSpd * 0.12;
-      this.vy = this.vy * 0.88 + forwardY * targetSpd * 0.12;
-
-      // 6. 横方向の速度を減衰させて、スピンせず直進状態に戻す
-      const headX = Math.cos(this.angle);
-      const headY = Math.sin(this.angle);
-      const normX = -headY;
-      const normY = headX;
-
-      let vLong = this.vx * headX + this.vy * headY;
-      let vLat = this.vx * normX + this.vy * normY;
-
-      // 指を離した後は横方向速度を強力に減衰させて直進復帰
-      const dampingRatio = this.isFingerDown ? 0.94 : (0.75 + 0.20 * (this.steerFadeFrames / 10));
-      vLat *= dampingRatio;
-
-      this.vx = headX * vLong + normX * vLat;
-      this.vy = headY * vLong + normY * vLat;
-
-      if (this.speed > 2.0) {
-        particles.addSkidMark(this.x, this.y, this.angle, this.width);
-        particles.addSmoke(this.x, this.y, this.angle, this.width);
-      }
-    } else {
-      // グリップ走行
-      // 7. 慣性は残すが、ドリフト終了後の角速度は数フレームで0に収束させる
-      this.angularVelocity *= 0.5;
-      if (Math.abs(this.angularVelocity) < 0.001) this.angularVelocity = 0;
-      this.angle = normalizeAngle(this.angle + this.angularVelocity);
-
-      if (this.speed > 0.5) {
-        const forwardX = Math.cos(this.angle);
-        const forwardY = Math.sin(this.angle);
-        const dot = this.vx * forwardX + this.vy * forwardY;
-        this.vx = forwardX * dot * 0.96;
-        this.vy = forwardY * dot * 0.96;
+    // 1. タップした地点の方向を目標方位とし、車体をその方向へ一定の旋回速度で向ける
+    if (this.targetPos) {
+      const dx = this.targetPos.x - this.x;
+      const dy = this.targetPos.y - this.y;
+      if (Math.hypot(dx, dy) > 8) {
+        const targetHeading = Math.atan2(dy, dx);
+        const diff = normalizeAngle(targetHeading - this.heading);
+        // 一定の旋回速度で向ける
+        const turnStep = Math.sign(diff) * Math.min(Math.abs(diff), PHYSICS_CONFIG.TURN_SPEED);
+        this.heading = normalizeAngle(this.heading + turnStep);
       }
     }
 
-    // 3. 車の位置は、速度ベクトルと慣性だけで更新する
-    const friction = this.isDrifting ? 0.99 : 0.985;
-    this.vx *= friction;
-    this.vy *= friction;
+    // 2. 現在の速度と進行方向の角度
+    this.speed = Math.hypot(this.vx, this.vy);
+    const moveAngle = this.speed > 0.05 ? Math.atan2(this.vy, this.vx) : this.heading;
+
+    // 3. 車体の向きと速度ベクトルの角度差をスリップ角とする
+    this.slipAngle = normalizeAngle(this.heading - moveAngle);
+    const slipAngleDeg = Math.abs(this.slipAngle) * (180 / Math.PI);
+
+    // 4. 20度を超えたらグリップ係数を下げ、ドリフト状態にする。小さくなったら戻す
+    let currentGrip = PHYSICS_CONFIG.NORMAL_GRIP;
+    if (slipAngleDeg > PHYSICS_CONFIG.SLIP_ANGLE_THRESHOLD_DEG && this.speed > 2.5) {
+      this.isDrifting = true;
+      currentGrip = PHYSICS_CONFIG.DRIFT_GRIP;
+
+      // ドリフト中は煙などのエフェクトを出す
+      particles.addSkidMark(this.x, this.y, this.heading, this.width);
+      particles.addSmoke(this.x, this.y, this.heading, this.width);
+    } else {
+      this.isDrifting = false;
+      currentGrip = PHYSICS_CONFIG.NORMAL_GRIP;
+    }
+
+    // 5. 推力も車体の向きにかかる
+    // 直線のダッシュのほうが、ドリフト中より最高速度が高い
+    const boostMult = 1.0 + (this.boostLevel - 1) * 0.35;
+    const maxSpeed = (this.isDrifting ? PHYSICS_CONFIG.TOP_SPEED_DRIFT : PHYSICS_CONFIG.TOP_SPEED_STRAIGHT) * boostMult;
+
+    if (this.isAccelerating) {
+      const fX = Math.cos(this.heading);
+      const fY = Math.sin(this.heading);
+      const fwdVel = this.vx * fX + this.vy * fY;
+
+      if (fwdVel < maxSpeed) {
+        this.vx += fX * PHYSICS_CONFIG.ACCEL_POWER;
+        this.vy += fY * PHYSICS_CONFIG.ACCEL_POWER;
+      }
+    }
+
+    // 6. ドリフト中は速度を落としすぎない(ダッシュ速度の80%程度は維持)
+    if (this.isDrifting && this.isAccelerating) {
+      const minDriftSpd = PHYSICS_CONFIG.TOP_SPEED_STRAIGHT * PHYSICS_CONFIG.DRIFT_MIN_SPEED_RATIO * boostMult;
+      if (this.speed < minDriftSpd) {
+        this.vx *= 1.04;
+        this.vy *= 1.04;
+      }
+    }
+
+    // 7. 速度ベクトルを車体の向きの成分(前後)と横向きの成分に分け、横成分をグリップ係数で減衰させる
+    const headX = Math.cos(this.heading);
+    const headY = Math.sin(this.heading);
+    const normX = -headY;
+    const normY = headX;
+
+    let vLong = this.vx * headX + this.vy * headY;
+    let vLat = this.vx * normX + this.vy * normY;
+
+    // 横成分をグリップ係数で減衰
+    vLat *= currentGrip;
+
+    this.vx = headX * vLong + normX * vLat;
+    this.vy = headY * vLong + normY * vLat;
+
+    // 8. 走行抵抗
+    this.vx *= PHYSICS_CONFIG.FRICTION;
+    this.vy *= PHYSICS_CONFIG.FRICTION;
 
     this.x += this.vx;
     this.y += this.vy;
+    this.speed = Math.hypot(this.vx, this.vy);
 
     if (this.speed > 1.2) {
       this.noCrashDistance += this.speed;
@@ -1242,12 +1209,6 @@ class TougeGame {
 
     this.camera = { x: 0, y: 0 };
     this.isPointerDown = false;
-    this.pointerStartScreen = { x: 0, y: 0 };
-    this.inputMode = 'NONE'; // 'NONE', 'DASH', 'DRIFT'
-    this.fingerPoints = [];
-    this.prevFingerAngle = null;
-    this.visualPath = [];
-    this.visualAlpha = 0;
     this.tapIndicator = null;
 
     this.startTime = 0;
@@ -1307,96 +1268,32 @@ class TougeGame {
       this.startRace();
     });
 
-    // タッチ＆マウス入力（タップ即ダッシュ＋曲率旋回ドリフト）
+    // タップ操作だけで曲がる＆加速する
     const handleStart = (clientX, clientY) => {
       if (this.appState !== 'PLAYING') return;
 
       this.isPointerDown = true;
-      this.pointerStartScreen = { x: clientX, y: clientY };
       const worldPos = this.screenToWorld(clientX, clientY);
-      this.inputMode = 'DASH';
+      this.car.setTarget(worldPos.x, worldPos.y);
 
-      // 1. pointerdownで、まずその地点へのダッシュを開始する
-      const dashed = this.car.dashToward(worldPos.x, worldPos.y, this.track, this.gameMode);
       this.tapIndicator = {
         x: worldPos.x,
         y: worldPos.y,
         radius: 8,
-        color: dashed ? '#00e676' : '#ffffff',
+        color: '#00e676',
         alpha: 0.9
       };
-
-      this.fingerPoints = [{ x: clientX, y: clientY }];
-      this.prevFingerAngle = null;
-      this.visualPath = [worldPos];
-      this.visualAlpha = 0.85;
     };
 
     const handleMove = (clientX, clientY) => {
       if (!this.isPointerDown || this.appState !== 'PLAYING') return;
-
-      const screenDist = Math.hypot(clientX - this.pointerStartScreen.x, clientY - this.pointerStartScreen.y);
-      const currentWorld = this.screenToWorld(clientX, clientY);
-
-      // 2 & 7. 指が最初の位置から12px以上動いたら、ダッシュ目標を即座に破棄してドリフトモードに切り替える
-      if (this.inputMode === 'DASH' && screenDist >= 12) {
-        this.inputMode = 'DRIFT';
-        this.car.startCurvatureDrift();
-        this.tapIndicator = null; // ダッシュ目標への移動は即座に破棄
-      }
-
-      if (this.inputMode === 'DRIFT') {
-        // 2. pointermoveごとに、指の進行方向の角度を直近4点程度で平滑化して求める
-        this.fingerPoints.push({ x: clientX, y: clientY });
-        if (this.fingerPoints.length > 5) {
-          this.fingerPoints.shift();
-        }
-
-        const pts = this.fingerPoints;
-        const pPrev = pts[pts.length - 2];
-        const pCur = pts[pts.length - 1];
-        const stepDist = Math.hypot(pCur.x - pPrev.x, pCur.y - pPrev.y);
-
-        if (stepDist >= 2.0 && pts.length >= 2) {
-          // 直近4点程度で平滑化
-          let sumDx = 0, sumDy = 0;
-          for (let i = 1; i < pts.length; i++) {
-            sumDx += (pts[i].x - pts[i - 1].x);
-            sumDy += (pts[i].y - pts[i - 1].y);
-          }
-          const curAngle = Math.atan2(sumDy, sumDx);
-
-          if (this.prevFingerAngle !== null) {
-            // 前回との角度差を、移動距離で割って「曲率」として保存
-            const dTheta = normalizeAngle(curAngle - this.prevFingerAngle);
-            const curvature = dTheta / stepDist;
-            // 3. ドリフト中の車は、その曲率を旋回入力として受け取り、現在の向きから旋回する
-            this.car.applyCurvature(curvature);
-          }
-          this.prevFingerAngle = curAngle;
-        }
-
-        // 4. 線の画面表示は、見た目だけの軌跡として描画し、車の移動には使わない
-        const lastV = this.visualPath[this.visualPath.length - 1];
-        if (!lastV || Math.hypot(currentWorld.x - lastV.x, currentWorld.y - lastV.y) > 10) {
-          this.visualPath.push(currentWorld);
-          if (this.visualPath.length > 30) this.visualPath.shift();
-        }
-        this.visualAlpha = 0.85;
-      }
+      const worldPos = this.screenToWorld(clientX, clientY);
+      this.car.setTarget(worldPos.x, worldPos.y);
     };
 
     const handleEnd = () => {
-      if (!this.isPointerDown) return;
       this.isPointerDown = false;
-
-      if (this.inputMode === 'DRIFT') {
-        // 6. 指を離したら、旋回入力を約10フレームで0に戻し、横方向の速度を減衰させて直進状態に戻す
-        this.car.releaseFinger();
-      }
-      this.inputMode = 'NONE';
-      this.prevFingerAngle = null;
-      this.fingerPoints = [];
+      this.car.stopAccelerating();
     };
 
     this.canvas.addEventListener('touchstart', (e) => {
@@ -1465,12 +1362,12 @@ class TougeGame {
       this.timerLabel.textContent = 'FREE TEST';
       this.bestDisplay.textContent = '広場練習中';
       this.restartBtn.textContent = '位置リセット';
-      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで即ダッシュ！<br>・なぞってドリフト練習！';
+      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップした方向へ旋回＆加速！<br>・急旋回でスライドドリフト！';
     } else {
       this.timerLabel.textContent = 'TIME ATTACK';
       this.bestDisplay.textContent = this.bestTime ? `BEST: ${this.formatTime(this.bestTime)}` : 'BEST: --:--.--';
       this.restartBtn.textContent = 'リスタート';
-      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップ即ダッシュ/なぞってドリフト<br>・壁衝突でコンボリセット';
+      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差20°以上でドリフト！';
     }
   }
 
@@ -1653,10 +1550,6 @@ class TougeGame {
       this.tapIndicator.alpha -= 0.06;
       if (this.tapIndicator.alpha <= 0) this.tapIndicator = null;
     }
-
-    if (!this.isPointerDown && this.visualAlpha > 0) {
-      this.visualAlpha = Math.max(0, this.visualAlpha - 0.05);
-    }
   }
 
   render() {
@@ -1679,7 +1572,6 @@ class TougeGame {
     }
 
     this.particles.draw(ctx);
-    this.renderDrawingLine(ctx);
 
     if (this.tapIndicator) {
       ctx.save();
@@ -1771,33 +1663,6 @@ class TougeGame {
     }
   }
 
-  // 4. 線の画面表示は、見た目だけの軌跡として描画し、車の移動には使わない
-  renderDrawingLine(ctx) {
-    if (!this.visualPath || this.visualPath.length < 2 || this.visualAlpha <= 0.02) return;
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, this.visualAlpha);
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(this.visualPath[0].x, this.visualPath[0].y);
-    for (let i = 1; i < this.visualPath.length; i++) {
-      ctx.lineTo(this.visualPath[i].x, this.visualPath[i].y);
-    }
-    ctx.stroke();
-
-    const end = this.visualPath[this.visualPath.length - 1];
-    if (end) {
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(end.x, end.y, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
   renderTrack(ctx) {
     const pts = this.track.points;
     if (pts.length < 2) return;
@@ -1884,7 +1749,13 @@ class TougeGame {
     const car = this.car;
     ctx.save();
     ctx.translate(car.x, car.y);
-    ctx.rotate(car.angle);
+    ctx.rotate(car.heading);
+
+    // ドリフト中はスリップ角に応じて車体を傾けて描画
+    if (car.isDrifting) {
+      const roll = Math.max(-0.16, Math.min(0.16, -car.slipAngle * 0.3));
+      ctx.rotate(roll);
+    }
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     safeRoundRect(ctx, -car.length/2 + 2, -car.width/2 + 3, car.length, car.width, 5);
