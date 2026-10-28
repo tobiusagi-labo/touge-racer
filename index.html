@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.8.3</div>
+        <div class="title-version">ver 0.8.4</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -559,19 +559,24 @@ const PHYSICS_CONFIG = {
   // 車体旋回速度 (ラジアン/フレーム)
   TURN_SPEED: 0.105,             // 約6.0度/フレーム
 
-  // 基本の横方向グリップ力 (0: 完全な氷 〜 1: 瞬時に止まる)
-  BASE_LATERAL_GRIP: 0.10,       // 基本グリップ力
-  DRIFT_LATERAL_GRIP: 0.02,      // ドリフト中の横グリップ力
+  // 横方向グリップ力 (0: 完全な氷 〜 1: 瞬時に止まる)
+  BASE_LATERAL_GRIP: 0.17,       // 基本の横グリップ (元の値の85%程度に戻す)
+  DRIFT_LATERAL_GRIP: 0.04,      // ドリフト中の横グリップ (現在の2倍程度に強化)
 
-  // 目標方位との角度差によるグリップ低下率 (角度差90度で基本値の30%に)
-  ANGLE_GRIP_MIN_RATIO: 0.30,
+  // 目標方位との角度差によるグリップ制御定数
+  GRIP_ANGLE_FULL_DEG: 10.0,     // 10度未満ならグリップ最大 (1.0)
+  GRIP_ANGLE_MIN_DEG: 90.0,      // 90度以上で最小比率へ
+  GRIP_ANGLE_MIN_RATIO: 0.50,    // 90度時のグリップ比率 (基本値の50%)
 
-  // 速度によるグリップ低下率 (最高速で基本値の60%に)
-  SPEED_GRIP_MIN_RATIO: 0.60,
+  // 速度によるグリップ低下率 (最高速のときに基本値の80%まで: 従来の60%から弱める)
+  SPEED_GRIP_MIN_RATIO: 0.80,
 
   // スリップ角ヒステリシス (度)
-  SLIP_ENTER_DEG: 12.0,          // 12度を超えたらドリフト突入
-  SLIP_EXIT_DEG: 5.0,            // 5度を下回ったらドリフト脱出
+  SLIP_ENTER_DEG: 18.0,          // 18度を超えたらドリフト突入
+  SLIP_EXIT_DEG: 8.0,            // 8度を下回ったらドリフト脱出
+
+  // 直進時の車体向き補正率 (舵を切っていない間に進行方向へ寄せる割合: 毎フレーム10%程度)
+  ALIGN_TO_VELOCITY_RATE: 0.10,
 
   // 推力
   ACCEL_POWER: 0.70,             // 加速推力
@@ -948,6 +953,7 @@ class Car {
     }
 
     // 2. 目標地点の近く(40px以内)に着いた、または目標を通り過ぎた(目標が車の後方になった)ら目標破棄
+    let targetAngleDiffDeg = 0;
     if (this.targetPos) {
       const dx = this.targetPos.x - this.x;
       const dy = this.targetPos.y - this.y;
@@ -965,6 +971,7 @@ class Car {
       } else {
         const targetHeading = Math.atan2(dy, dx);
         const diff = normalizeAngle(targetHeading - this.heading);
+        targetAngleDiffDeg = Math.abs(diff) * (180 / Math.PI);
         // 一定の旋回速度で向ける (safeDt 比例)
         const frameTurnSpeed = PHYSICS_CONFIG.TURN_SPEED * (safeDt / (1/60));
         this.angularVelocity = Math.sign(diff) * Math.min(Math.abs(diff), frameTurnSpeed);
@@ -978,6 +985,15 @@ class Car {
       this.angularVelocity *= decay;
       if (Math.abs(this.angularVelocity) < 0.001) this.angularVelocity = 0;
       this.heading = normalizeAngle(this.heading + this.angularVelocity);
+    }
+
+    // 舵を切っていない間(目標がないとき、または角度差が10度未満のとき)は、車体の向きを速度ベクトルの方向へ、毎フレーム少しずつ(10%程度)寄せる
+    const isNotSteering = !this.targetPos || targetAngleDiffDeg < PHYSICS_CONFIG.GRIP_ANGLE_FULL_DEG;
+    if (isNotSteering && this.speed > 0.5) {
+      const moveAngle = Math.atan2(this.vy, this.vx);
+      const alignDiff = normalizeAngle(moveAngle - this.heading);
+      const alignFactor = Math.min(1.0, PHYSICS_CONFIG.ALIGN_TO_VELOCITY_RATE * (safeDt / (1/60)));
+      this.heading = normalizeAngle(this.heading + alignDiff * alignFactor);
     }
 
     this.speed = Math.hypot(this.vx, this.vy);
@@ -995,7 +1011,7 @@ class Car {
       this.slipAngle = normalizeAngle(this.heading - moveAngle);
       const slipAngleDeg = Math.abs(this.slipAngle) * (180 / Math.PI);
 
-      // ドリフト状態の判定にヒステリシスを設ける (12度を超えたら入り、5度を下回ったら抜ける)
+      // ドリフト状態の判定にヒステリシスを設ける (18度を超えたら入り、8度を下回ったら抜ける)
       if (!this.isDrifting && slipAngleDeg > PHYSICS_CONFIG.SLIP_ENTER_DEG) {
         this.isDrifting = true;
       } else if (this.isDrifting && slipAngleDeg < PHYSICS_CONFIG.SLIP_EXIT_DEG) {
@@ -1003,32 +1019,32 @@ class Car {
       }
 
       if (this.isDrifting) {
-        // ドリフト中は、横速度の減衰を非常に弱くする (氷の上のように滑る)
+        // ドリフト中の横速度減衰 (0.04: 従来の2倍程度に強化)
         currentGripPower = PHYSICS_CONFIG.DRIFT_LATERAL_GRIP;
 
         particles.addSkidMark(this.x, this.y, this.heading, this.width);
         particles.addSmoke(this.x, this.y, this.heading, this.width);
       } else {
         // グリップ走行中
-        let grip = PHYSICS_CONFIG.BASE_LATERAL_GRIP;
+        if (isNotSteering) {
+          // 目標方位との角度差が10度未満（または目標なし）のときは、グリップを最大にする
+          currentGripPower = 1.0;
+        } else {
+          // 10度から90度の間は、角度差に応じて基本値の100%から50%まで滑らかに下げる (smoothstep)
+          let grip = PHYSICS_CONFIG.BASE_LATERAL_GRIP;
 
-        // 目標方位との角度差が大きいほど、グリップをさらに下げる(角度差が90度のときに基本値の30%になる程度)
-        if (this.targetPos) {
-          const dx = this.targetPos.x - this.x;
-          const dy = this.targetPos.y - this.y;
-          const targetHeading = Math.atan2(dy, dx);
-          const angleDiff = Math.abs(normalizeAngle(targetHeading - this.heading));
-          const angleRatio = Math.min(1.0, angleDiff / (Math.PI / 2));
-          const angleFactor = 1.0 - (1.0 - PHYSICS_CONFIG.ANGLE_GRIP_MIN_RATIO) * angleRatio;
+          const t = Math.min(1.0, Math.max(0, (targetAngleDiffDeg - PHYSICS_CONFIG.GRIP_ANGLE_FULL_DEG) / (PHYSICS_CONFIG.GRIP_ANGLE_MIN_DEG - PHYSICS_CONFIG.GRIP_ANGLE_FULL_DEG)));
+          const smoothT = t * t * (3 - 2 * t);
+          const angleFactor = 1.0 - (1.0 - PHYSICS_CONFIG.GRIP_ANGLE_MIN_RATIO) * smoothT;
           grip *= angleFactor;
+
+          // 速度によるグリップ低下: 最高速のときに基本値の80%まで (従来の60%から弱める)
+          const speedRatio = Math.min(1.0, this.speed / PHYSICS_CONFIG.TOP_SPEED_STRAIGHT);
+          const speedFactor = 1.0 - (1.0 - PHYSICS_CONFIG.SPEED_GRIP_MIN_RATIO) * speedRatio;
+          grip *= speedFactor;
+
+          currentGripPower = grip;
         }
-
-        // 速度が高いほどグリップを下げる(最高速のときに基本値の60%)
-        const speedRatio = Math.min(1.0, this.speed / PHYSICS_CONFIG.TOP_SPEED_STRAIGHT);
-        const speedFactor = 1.0 - (1.0 - PHYSICS_CONFIG.SPEED_GRIP_MIN_RATIO) * speedRatio;
-        grip *= speedFactor;
-
-        currentGripPower = grip;
       }
     }
 
@@ -1497,12 +1513,12 @@ class TougeGame {
       this.timerLabel.textContent = 'FREE TEST';
       this.bestDisplay.textContent = '広場練習中';
       this.restartBtn.textContent = '位置リセット';
-      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで旋回＆加速！<br>・角度差12°以上で氷上ドリフト！';
+      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで旋回＆加速！<br>・角度差18°以上でドリフト！';
     } else {
       this.timerLabel.textContent = 'TIME ATTACK';
       this.bestDisplay.textContent = this.bestTime ? `BEST: ${this.formatTime(this.bestTime)}` : 'BEST: --:--.--';
       this.restartBtn.textContent = 'リスタート';
-      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差12°以上で氷上ドリフト！';
+      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差18°以上でドリフト！';
     }
   }
 
