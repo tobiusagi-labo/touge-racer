@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.8.6</div>
+        <div class="title-version">ver 0.8.7</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -551,7 +551,9 @@ const PHYSICS_CONFIG = {
   TOP_SPEED_DRIFT: 12.0,        // ドリフト中最高速度
 
   // アーケード方式ドリフト制御定数
-  DRIFT_ROTATION_SPEED: 2.5,    // 速度ベクトルの旋回角速度 (rad/s, 初期値2.5)
+  DRIFT_TURN_RADIUS: 150.0,     // 旋回半径 (px, 初期値150: 速度が変わっても半径が一定になる)
+  DRIFT_OMEGA_MIN: 1.5,         // 角速度下限 (rad/s)
+  DRIFT_OMEGA_MAX: 4.0,         // 角速度上限 (rad/s)
   DRIFT_BODY_LEAD_DEG: 30.0,    // 速度方向に対して旋回方向へ先行させる車首ドリフト角 (度)
   DRIFT_EXIT_ANGLE_DIFF_DEG: 8.0,// 速度方向と目標方位の差がこれ以内になったらドリフト終了 (度)
   DRIFT_SAFETY_MAX_SEC: 2.0,    // ドリフトの最大安全タイマー (秒, 最大2秒で強制終了)
@@ -919,24 +921,30 @@ class Car {
     }
 
     const finalTargetHeading = normalizeAngle(this.heading + clampedDiff);
-    const dist = Math.hypot(dx, dy);
-
-    this.targetHeading = finalTargetHeading;
-    this.targetPos = {
-      x: this.x + Math.cos(finalTargetHeading) * dist,
-      y: this.y + Math.sin(finalTargetHeading) * dist
-    };
-    this.isAccelerating = true;
-    this.dashTimer = 0;
-
-    // 角度差が小さいタップ(20度以内)は、ドリフトに入らず、通常のダッシュとして処理する
     const diffDeg = Math.abs(clampedDiff) * (180 / Math.PI);
+
+    // 角度差が20度以内の浅いタップは、ドリフトに入らず、従来どおりタップ地点へのダッシュにする
     if (diffDeg > PHYSICS_CONFIG.DRIFT_TRIGGER_ANGLE_DEG && this.driftCooldownTimer <= 0) {
+      // ドリフトに入る瞬間、タップ地点への目標(位置)は破棄し、目標方位(角度)だけを保存する
       this.isDrifting = true;
       this.driftTurnSign = Math.sign(clampedDiff) || 1;
       this.driftTimer = 0;
       this.driftRecoverTimer = 0;
+      this.targetHeading = finalTargetHeading; // ドリフト中は一定の値として固定保存
+      this.targetPos = null;                   // 目標位置は破棄
+      this.isAccelerating = true;
+      this.dashTimer = 0;
     } else {
+      // 浅いタップ: 従来どおりタップ地点へのダッシュ
+      const dist = Math.hypot(dx, dy);
+      this.targetHeading = finalTargetHeading;
+      this.targetPos = {
+        x: this.x + Math.cos(finalTargetHeading) * dist,
+        y: this.y + Math.sin(finalTargetHeading) * dist
+      };
+      this.isAccelerating = true;
+      this.dashTimer = 0;
+
       if (this.isDrifting) {
         this.endDriftWithRecovery();
       }
@@ -955,6 +963,7 @@ class Car {
     this.driftTimer = 0;
     this.driftRecoverTimer = 0;
     this.driftCooldownTimer = PHYSICS_CONFIG.DRIFT_COOLDOWN_DURATION;
+    this.targetPos = null;
     this.slipAngle = 0;
     this.angularVelocity = 0;
   }
@@ -965,6 +974,9 @@ class Car {
       this.driftTimer = 0;
       this.driftRecoverTimer = PHYSICS_CONFIG.DRIFT_RECOVER_DURATION;
       this.driftCooldownTimer = PHYSICS_CONFIG.DRIFT_COOLDOWN_DURATION;
+      // ドリフト終了時は、ダッシュ目標を復活させない。その時点の速度方向へ、そのまま直進する
+      this.targetPos = null;
+      this.isAccelerating = false;
       this.angularVelocity = 0;
     }
   }
@@ -1017,20 +1029,15 @@ class Car {
     if (this.isDrifting) {
       // =========================================================================
       // アーケード方式ドリフト
-      // 速度ベクトルの方向を一定角速度(2.5 rad/s)で目標方位へ回し、車首は30度先行
+      // 速度ベクトルの方向を一定半径(150px)で目標方位へ回し、車首は30度先行
       // =========================================================================
       this.driftTimer += safeDt;
 
       // 速度ベクトルの進行方向 (速度が小さすぎる場合は車首方向)
       let moveAngle = this.speed > 0.05 ? Math.atan2(this.vy, this.vx) : this.heading;
 
-      // 目標方位
-      let currentTargetHeading = this.targetHeading;
-      if (this.targetPos) {
-        const dx = this.targetPos.x - this.x;
-        const dy = this.targetPos.y - this.y;
-        currentTargetHeading = Math.atan2(dy, dx);
-      }
+      // ドリフト中は、入った瞬間に保存した目標方位(角度)を一定の値として使い、毎フレームの再計算はしない
+      const currentTargetHeading = this.targetHeading;
 
       const diffToTarget = normalizeAngle(currentTargetHeading - moveAngle);
       const absDiffDeg = Math.abs(diffToTarget) * (180 / Math.PI);
@@ -1039,8 +1046,12 @@ class Car {
       if (absDiffDeg <= PHYSICS_CONFIG.DRIFT_EXIT_ANGLE_DIFF_DEG || this.driftTimer >= PHYSICS_CONFIG.DRIFT_SAFETY_MAX_SEC) {
         this.endDriftWithRecovery();
       } else {
-        // 1. 速度ベクトルの方向を目標方位へ一定の角速度(初期値2.5 rad/s)で回す
-        const turnStep = Math.sign(diffToTarget) * Math.min(Math.abs(diffToTarget), PHYSICS_CONFIG.DRIFT_ROTATION_SPEED * safeDt);
+        // 1. 旋回の角速度は速度÷旋回半径で求める(旋回半径150pxで一定)。上下限1.5〜4.0 rad/s
+        const speedPxPerSec = this.speed * 60;
+        let omega = speedPxPerSec / PHYSICS_CONFIG.DRIFT_TURN_RADIUS;
+        omega = Math.max(PHYSICS_CONFIG.DRIFT_OMEGA_MIN, Math.min(PHYSICS_CONFIG.DRIFT_OMEGA_MAX, omega));
+
+        const turnStep = Math.sign(diffToTarget) * Math.min(Math.abs(diffToTarget), omega * safeDt);
         moveAngle = normalizeAngle(moveAngle + turnStep);
 
         // 2. スリップによる減速だけを軽く加える
