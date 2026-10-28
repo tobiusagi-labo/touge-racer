@@ -69,7 +69,7 @@
     }
 
     /* ==========================================================================
-       Shutter Screen Transition
+       Shutter Transition
        ========================================================================== */
     #shutter-wrapper {
       position: absolute;
@@ -77,22 +77,20 @@
       left: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none;
-      z-index: 100;
-      display: flex;
+      display: none;
       flex-direction: column;
+      z-index: 100;
+      pointer-events: none;
     }
     .shutter-blade {
       width: 100%;
       height: 50%;
-      background: linear-gradient(180deg, #2c332e 0%, #1e2420 50%, #2c332e 100%);
-      border: 2px solid #141815;
-      box-shadow: inset 0 2px 4px rgba(255,255,255,0.08), inset 0 -2px 4px rgba(0,0,0,0.6);
-      transition: transform 0.32s cubic-bezier(0.77, 0, 0.175, 1);
+      background: linear-gradient(180deg, #2e3630 0%, #1c221e 50%, #2e3630 100%);
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.7);
+      transition: transform 0.28s cubic-bezier(0.7, 0, 0.2, 1);
       display: flex;
       justify-content: center;
       align-items: center;
-      position: relative;
     }
     .shutter-blade-top {
       transform: translateY(-100%);
@@ -102,7 +100,6 @@
       transform: translateY(100%);
       border-top: 4px solid #ffeb3b;
     }
-    /* シャッターが閉じた状態 */
     #shutter-wrapper.closed .shutter-blade-top {
       transform: translateY(0%);
     }
@@ -110,12 +107,11 @@
       transform: translateY(0%);
     }
     .shutter-logo {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 900;
       letter-spacing: 3px;
       color: #ffeb3b;
-      opacity: 0.8;
-      text-transform: uppercase;
+      opacity: 0.85;
     }
 
     /* ==========================================================================
@@ -133,12 +129,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 36px 20px 24px;
-      z-index: 40;
-      transition: opacity 0.25s ease;
-    }
-    #title-screen.hidden {
-      opacity: 0;
-      pointer-events: none;
+      z-index: 50;
     }
     .title-header {
       display: flex;
@@ -172,26 +163,16 @@
       color: #00e676;
       letter-spacing: 4px;
       margin-top: 6px;
-      text-shadow: 0 2px 8px rgba(0, 230, 118, 0.5);
     }
-    /* タイトルの中央ビジュアル */
     .title-hero {
       position: relative;
       width: 100%;
       display: flex;
-      flex-direction: column;
+      justify-content: center;
       align-items: center;
       margin: 15px 0;
     }
-    .hero-car-preview {
-      width: 180px;
-      height: 110px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
 
-    /* モード選択カード */
     .title-mode-box {
       width: 100%;
       max-width: 310px;
@@ -222,9 +203,8 @@
       font-size: 12px;
       font-weight: 800;
       cursor: pointer;
-      pointer-events: auto;
-      transition: all 0.15s ease;
       text-align: center;
+      transition: all 0.15s ease;
     }
     .mode-opt-btn.active {
       background: #254d32;
@@ -241,14 +221,12 @@
       line-height: 1.35;
     }
 
-    /* スタートボタン */
     .title-start-area {
       width: 100%;
       max-width: 310px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
     }
     .title-start-btn {
       width: 100%;
@@ -260,16 +238,10 @@
       padding: 13px 24px;
       border-radius: 30px;
       cursor: pointer;
-      pointer-events: auto;
       box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
-      animation: pulseBtn 1.8s infinite ease-in-out;
     }
     .title-start-btn:active {
       transform: scale(0.96);
-    }
-    @keyframes pulseBtn {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.03); }
     }
 
     /* ==========================================================================
@@ -394,8 +366,9 @@
       background: #395c46;
     }
     .title-back-btn {
-      background: #3a3224;
-      border-color: #736345;
+      background: #3d3121;
+      border-color: #856a42;
+      color: #ffeb3b;
     }
 
     /* Result Modal */
@@ -406,15 +379,10 @@
       width: 100%;
       height: 100%;
       background: rgba(0,0,0,0.75);
-      display: flex;
+      display: none;
       justify-content: center;
       align-items: center;
       z-index: 50;
-      transition: opacity 0.2s ease;
-    }
-    .modal-overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
     }
     .modal-box {
       background: #18261e;
@@ -450,7 +418,6 @@
       color: #00e676;
     }
 
-    /* Mini-map */
     #minimap {
       position: absolute;
       top: 12px;
@@ -461,24 +428,6 @@
       border: 1.5px solid #4a6c55;
       border-radius: 10px;
       pointer-events: none;
-      z-index: 20;
-    }
-    .sound-btn {
-      pointer-events: auto;
-      position: absolute;
-      top: 96px;
-      right: 12px;
-      background: rgba(18, 26, 21, 0.85);
-      border: 1px solid #4a6c55;
-      color: #fff;
-      font-size: 13px;
-      width: 30px;
-      height: 30px;
-      border-radius: 6px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
       z-index: 20;
     }
 
@@ -506,12 +455,11 @@
     <!-- Canvas -->
     <canvas id="gameCanvas"></canvas>
     <canvas id="minimap"></canvas>
-    <button id="soundToggle" class="sound-btn" title="サウンド切替">🔊</button>
 
     <!-- Shutter Transition Overlay -->
     <div id="shutter-wrapper">
       <div class="shutter-blade shutter-blade-top">
-        <div class="shutter-logo">TOUGE DRIFT</div>
+        <div class="shutter-logo">TOUGE RACER</div>
       </div>
       <div class="shutter-blade shutter-blade-bottom">
         <div class="shutter-logo">GARAGE OPEN</div>
@@ -521,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.5.0</div>
+        <div class="title-version">ver 0.5.1</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -533,8 +481,8 @@
       <div class="title-mode-box">
         <div class="mode-select-label">CHOOSE MODE</div>
         <div class="mode-options">
-          <button class="mode-opt-btn active" id="btnTitleModeFree">🏟️ 広場テスト</button>
-          <button class="mode-opt-btn" id="btnTitleModeTouge">🏁 峠アタック</button>
+          <button class="mode-opt-btn active" id="btnTitleModeFree" type="button">🏟️ 広場テスト</button>
+          <button class="mode-opt-btn" id="btnTitleModeTouge" type="button">🏁 峠アタック</button>
         </div>
         <div class="mode-desc-text" id="titleModeDesc">
           壁なし・全方位アスファルトでダッシュとドリフトを自由に練習
@@ -542,7 +490,7 @@
       </div>
 
       <div class="title-start-area">
-        <button class="title-start-btn" id="btnStartGame">START GAME</button>
+        <button class="title-start-btn" id="btnStartGame" type="button">START GAME</button>
       </div>
     </div>
 
@@ -573,21 +521,21 @@
           ・線を描いて離すとドリフト開始！
         </div>
         <div class="hud-bottom-right">
-          <button class="action-btn" id="restartBtn">位置リセット</button>
-          <button class="action-btn title-back-btn" id="btnBackToTitle">タイトルへ</button>
+          <button class="action-btn" id="restartBtn" type="button">位置リセット</button>
+          <button class="action-btn title-back-btn" id="btnBackToTitle" type="button">タイトルへ戻る</button>
         </div>
       </div>
     </div>
 
     <!-- Goal / Clear Modal -->
-    <div class="modal-overlay hidden" id="gameModal">
+    <div class="modal-overlay" id="gameModal">
       <div class="modal-box">
         <div class="modal-title" id="modalTitle">🏁 GOAL!</div>
         <div class="modal-stats" id="modalStats">
           <div class="stat-row"><span>ゴールタイム:</span><span class="stat-val" id="finalTime">00:00.00</span></div>
           <div class="stat-row"><span>ノーミス距離:</span><span class="stat-val" id="maxCombo">0m</span></div>
         </div>
-        <button class="title-start-btn" id="modalActionBtn" style="padding:10px 20px; font-size:16px;">もう一度走る</button>
+        <button class="title-start-btn" id="modalActionBtn" type="button" style="padding:10px 20px; font-size:16px;">もう一度走る</button>
       </div>
     </div>
   </div>
@@ -623,142 +571,7 @@ function safeRoundRect(ctx, x, y, width, height, radius) {
 }
 
 /* ==========================================================================
-   Sound Synth
-   ========================================================================== */
-class SoundEngine {
-  constructor() {
-    this.ctx = null;
-    this.enabled = true;
-    this.driftOsc = null;
-    this.driftGain = null;
-  }
-  init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) this.ctx = new AudioCtx();
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-  }
-  playShutter() {
-    if (!this.enabled || !this.ctx) return;
-    try {
-      const t = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(90, t);
-      osc.frequency.linearRampToValueAtTime(45, t + 0.3);
-      gain.gain.setValueAtTime(0.2, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.31);
-    } catch(e){}
-  }
-  playDash(level = 1) {
-    if (!this.enabled || !this.ctx) return;
-    try {
-      const t = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      const baseFreq = 230 + level * 65;
-      osc.frequency.setValueAtTime(baseFreq, t);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.2, t + 0.16);
-
-      gain.gain.setValueAtTime(0.26, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.19);
-    } catch(e){}
-  }
-  startDriftSound() {
-    if (!this.enabled || !this.ctx || this.driftOsc) return;
-    try {
-      const t = this.ctx.currentTime;
-      this.driftOsc = this.ctx.createOscillator();
-      this.driftGain = this.ctx.createGain();
-      this.driftOsc.type = 'sawtooth';
-      this.driftOsc.frequency.setValueAtTime(280, t);
-      
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1300, t);
-      filter.Q.setValueAtTime(3.0, t);
-
-      this.driftGain.gain.setValueAtTime(0.01, t);
-      this.driftGain.gain.linearRampToValueAtTime(0.08, t + 0.05);
-
-      this.driftOsc.connect(filter);
-      filter.connect(this.driftGain);
-      this.driftGain.connect(this.ctx.destination);
-      this.driftOsc.start();
-    } catch(e){}
-  }
-  stopDriftSound() {
-    if (this.driftOsc && this.driftGain && this.ctx) {
-      try {
-        const t = this.ctx.currentTime;
-        this.driftGain.gain.linearRampToValueAtTime(0.001, t + 0.05);
-        setTimeout(() => {
-          if (this.driftOsc) {
-            try { this.driftOsc.stop(); } catch(e){}
-            this.driftOsc.disconnect();
-            this.driftOsc = null;
-          }
-        }, 60);
-      } catch(e){}
-    }
-  }
-  playCrash() {
-    if (!this.enabled || !this.ctx) return;
-    try {
-      const t = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(130, t);
-      osc.frequency.exponentialRampToValueAtTime(35, t + 0.16);
-
-      gain.gain.setValueAtTime(0.25, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.19);
-    } catch(e){}
-  }
-  playGoal() {
-    if (!this.enabled || !this.ctx) return;
-    try {
-      const melody = [523, 659, 784, 1046];
-      melody.forEach((freq, idx) => {
-        const t = this.ctx.currentTime + idx * 0.12;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, t);
-        gain.gain.setValueAtTime(0.25, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.31);
-      });
-    } catch(e){}
-  }
-}
-const sound = new SoundEngine();
-
-/* ==========================================================================
-   Touge Track
+   Touge Track (コースデータ)
    ========================================================================== */
 class Track {
   constructor() {
@@ -827,6 +640,7 @@ class Track {
       accum += dist;
 
       this.segments.push({
+        index: i,
         p1, p2, dx, dy, dist, angle, nx, ny,
         left1, right1, left2, right2,
         accumDist: accum
@@ -863,12 +677,17 @@ class Track {
     };
   }
 
-  getTrackRelation(px, py) {
+  // ★重要改善：隣接セグメントの局所検索（ヘアピン誤判定・ワープの根絶）
+  getTrackRelationLocal(px, py, currentIdx = 0) {
     let minDist = Infinity;
     let closestSeg = null;
     let closestProj = { x: px, y: py };
 
-    for (let i = 0; i < this.segments.length; i++) {
+    // 現在の進行位置の前後15セグメント内のみで判定（別ルートへの誤吸着を完全に防止）
+    const minI = Math.max(0, currentIdx - 8);
+    const maxI = Math.min(this.segments.length - 1, currentIdx + 12);
+
+    for (let i = minI; i <= maxI; i++) {
       const seg = this.segments[i];
       const vx = px - seg.p1.x;
       const vy = py - seg.p1.y;
@@ -882,6 +701,25 @@ class Track {
         minDist = d;
         closestSeg = seg;
         closestProj = { x: projX, y: projY };
+      }
+    }
+
+    // 万一見つからない場合のフォールバック（全探索）
+    if (!closestSeg) {
+      for (let i = 0; i < this.segments.length; i++) {
+        const seg = this.segments[i];
+        const vx = px - seg.p1.x;
+        const vy = py - seg.p1.y;
+        const segLenSq = (seg.dist * seg.dist) || 0.001;
+        const t = Math.max(0, Math.min(1, (vx * seg.dx + vy * seg.dy) / segLenSq));
+        const projX = seg.p1.x + t * seg.dx;
+        const projY = seg.p1.y + t * seg.dy;
+        const d = Math.hypot(px - projX, py - projY);
+        if (d < minDist) {
+          minDist = d;
+          closestSeg = seg;
+          closestProj = { x: projX, y: projY };
+        }
       }
     }
 
@@ -946,7 +784,6 @@ class SkidpadArea {
       const ny = Math.sin(ang);
       const normalVel = car.vx * nx + car.vy * ny;
       if (normalVel > 0) {
-        sound.playCrash();
         particles.addSparks(car.x, car.y, -nx, -ny);
         car.vx -= normalVel * 1.3;
         car.vy -= normalVel * 1.3;
@@ -959,7 +796,7 @@ class SkidpadArea {
 }
 
 /* ==========================================================================
-   Player Car Entity & Robust Drift Physics (フリーズ完全防止仕様)
+   Player Car Entity & Physics (堅牢・フリーズ完全防止)
    ========================================================================== */
 class Car {
   constructor(startX, startY, startAngle) {
@@ -983,18 +820,37 @@ class Car {
     this.isDrifting = false;
     this.driftPath = [];
     this.driftIndex = 0;
-    this.driftTimer = 0; // 無限ドリフト防止タイマー
+    this.driftTimer = 0;
 
+    this.currentSegIndex = 0;
     this.noCrashDistance = 0;
     this.boostLevel = 1;
     this.dashPowerBase = 12.0;
   }
 
-  dashToward(targetX, targetY) {
+  // ★重要改善：コース外タップ時も安全な道路内へ向けてダッシュ
+  dashToward(targetX, targetY, track, gameMode) {
     if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return false;
-    const dx = targetX - this.x;
-    const dy = targetY - this.y;
-    if (Math.hypot(dx, dy) < 8) return false;
+
+    let destX = targetX;
+    let destY = targetY;
+
+    // 峠モードの場合：タップ地点がコース外なら、最寄りの道路内境界にクランプ！
+    if (gameMode === 'TOUGE' && track) {
+      const rel = track.getTrackRelationLocal(destX, destY, this.currentSegIndex);
+      const halfRoad = track.roadWidth / 2 - 12;
+      if (rel.minDist > halfRoad) {
+        const offX = destX - rel.proj.x;
+        const offY = destY - rel.proj.y;
+        const d = Math.hypot(offX, offY) || 0.001;
+        destX = rel.proj.x + (offX / d) * halfRoad;
+        destY = rel.proj.y + (offY / d) * halfRoad;
+      }
+    }
+
+    const dx = destX - this.x;
+    const dy = destY - this.y;
+    if (Math.hypot(dx, dy) < 6) return false;
 
     this.angle = Math.atan2(dy, dx);
     const boostMult = 1.0 + (this.boostLevel - 1) * 0.4;
@@ -1004,21 +860,32 @@ class Car {
     this.vy = Math.sin(this.angle) * power;
 
     this.endDrift();
-    sound.playDash(this.boostLevel);
     return true;
   }
 
-  startDriftAlongPath(rawPoints) {
+  startDriftAlongPath(rawPoints, track, gameMode) {
     if (!rawPoints || rawPoints.length < 2) return;
 
-    // 異常値や近すぎる重複点をクレンジング
+    // クレンジング＆コース内クランプ
     const cleanPoints = [{ x: this.x, y: this.y }];
     for (let i = 0; i < rawPoints.length; i++) {
-      const p = rawPoints[i];
-      if (Number.isFinite(p.x) && Number.isFinite(p.y)) {
+      let px = rawPoints[i].x;
+      let py = rawPoints[i].y;
+      if (Number.isFinite(px) && Number.isFinite(py)) {
+        if (gameMode === 'TOUGE' && track) {
+          const rel = track.getTrackRelationLocal(px, py, this.currentSegIndex);
+          const halfRoad = track.roadWidth / 2 - 12;
+          if (rel.minDist > halfRoad) {
+            const offX = px - rel.proj.x;
+            const offY = py - rel.proj.y;
+            const d = Math.hypot(offX, offY) || 0.001;
+            px = rel.proj.x + (offX / d) * halfRoad;
+            py = rel.proj.y + (offY / d) * halfRoad;
+          }
+        }
         const last = cleanPoints[cleanPoints.length - 1];
-        if (Math.hypot(p.x - last.x, p.y - last.y) >= 15) {
-          cleanPoints.push(p);
+        if (Math.hypot(px - last.x, py - last.y) >= 14) {
+          cleanPoints.push({ x: px, y: py });
         }
       }
     }
@@ -1037,8 +904,6 @@ class Car {
     const power = (this.dashPowerBase * 0.95) * boostMult;
     this.vx = Math.cos(ang) * power;
     this.vy = Math.sin(ang) * power;
-
-    sound.startDriftSound();
   }
 
   endDrift() {
@@ -1046,11 +911,9 @@ class Car {
     this.driftPath = [];
     this.driftIndex = 0;
     this.driftTimer = 0;
-    sound.stopDriftSound();
   }
 
   update(gameMode, track, skidpad, particles) {
-    // 安全チェック：万一 NaN が混入した場合の自己復旧
     if (!Number.isFinite(this.x) || !Number.isFinite(this.y) || !Number.isFinite(this.vx) || !Number.isFinite(this.vy)) {
       this.reset();
       return;
@@ -1062,15 +925,14 @@ class Car {
     if (this.isDrifting && this.driftPath.length > 0) {
       this.driftTimer += 0.016;
 
-      // セーフティ：3秒以上ドリフトが継続するか、スタックした場合は自動脱出
-      if (this.driftTimer > 3.0) {
+      if (this.driftTimer > 2.8) {
         this.endDrift();
       } else {
-        // 次のターゲットポイントを探す
-        while (this.driftIndex < this.driftPath.length) {
+        // 安全な for ループ（無限ループの完全防止）
+        for (let step = 0; step < 5; step++) {
+          if (this.driftIndex >= this.driftPath.length) break;
           const pt = this.driftPath[this.driftIndex];
-          const dist = Math.hypot(pt.x - this.x, pt.y - this.y);
-          if (dist > 35) break;
+          if (Math.hypot(pt.x - this.x, pt.y - this.y) > 35) break;
           this.driftIndex++;
         }
 
@@ -1086,16 +948,15 @@ class Car {
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff -= Math.PI * 2;
 
-            // 終点付近ではスピンしないよう旋回レートを抑制
             const isNearEnd = (this.driftIndex >= this.driftPath.length - 2);
-            const turnRate = isNearEnd ? 0.14 : 0.22;
+            const turnRate = isNearEnd ? 0.12 : 0.20;
             this.angle += diff * turnRate;
 
             const fX = Math.cos(this.angle);
             const fY = Math.sin(this.angle);
             const targetSpd = Math.max(5.5, this.speed * 0.98);
-            this.vx = this.vx * 0.84 + fX * targetSpd * 0.16;
-            this.vy = this.vy * 0.84 + fY * targetSpd * 0.16;
+            this.vx = this.vx * 0.85 + fX * targetSpd * 0.15;
+            this.vy = this.vy * 0.85 + fY * targetSpd * 0.15;
 
             if (this.speed > 2.2) {
               particles.addSkidMark(this.x, this.y, this.angle, this.width);
@@ -1107,7 +968,6 @@ class Car {
         }
       }
     } else {
-      // グリップ走行
       if (this.speed > 0.5) {
         const forwardX = Math.cos(this.angle);
         const forwardY = Math.sin(this.angle);
@@ -1117,7 +977,6 @@ class Car {
       }
     }
 
-    // 自然減速
     const friction = this.isDrifting ? 0.99 : 0.985;
     this.vx *= friction;
     this.vy *= friction;
@@ -1129,10 +988,8 @@ class Car {
       this.noCrashDistance += this.speed;
       if (this.boostLevel === 1 && this.noCrashDistance > 600) {
         this.boostLevel = 2;
-        sound.playLevelUp();
       } else if (this.boostLevel === 2 && this.noCrashDistance > 1600) {
         this.boostLevel = 3;
-        sound.playLevelUp();
       }
     }
 
@@ -1143,8 +1000,16 @@ class Car {
     }
   }
 
+  // ★重要改善：現在のセグメントインデックスを追従＆安全な壁面反射
   checkTougeCollision(track, particles) {
-    const rel = track.getTrackRelation(this.x, this.y);
+    const rel = track.getTrackRelationLocal(this.x, this.y, this.currentSegIndex);
+    if (rel.closestSeg) {
+      // 進行位置を安全に更新（逆戻りはせず、前進のみ）
+      if (rel.closestSeg.index >= this.currentSegIndex) {
+        this.currentSegIndex = rel.closestSeg.index;
+      }
+    }
+
     const halfRoad = track.roadWidth / 2;
     const safeLimit = halfRoad - 8;
 
@@ -1154,6 +1019,7 @@ class Car {
       const offY = this.y - proj.y;
       const dist = Math.hypot(offX, offY) || 0.001;
 
+      // 道路の内側に強制クランプ（絶対に外側へ飛び出さない）
       this.x = proj.x + (offX / dist) * safeLimit;
       this.y = proj.y + (offY / dist) * safeLimit;
 
@@ -1162,9 +1028,7 @@ class Car {
       const normalVel = this.vx * nx + this.vy * ny;
 
       if (normalVel > 0) {
-        sound.playCrash();
         particles.addSparks(this.x, this.y, -nx, -ny);
-
         this.vx -= normalVel * 1.3;
         this.vy -= normalVel * 1.3;
         this.vx *= 0.55;
@@ -1320,7 +1184,6 @@ class TougeGame {
     this.btnStartGame = document.getElementById('btnStartGame');
     this.restartBtn = document.getElementById('restartBtn');
     this.btnBackToTitle = document.getElementById('btnBackToTitle');
-    this.soundToggle = document.getElementById('soundToggle');
 
     this.gameMode = 'FREE'; // 'FREE' or 'TOUGE'
     this.appState = 'TITLE'; // 'TITLE' or 'PLAYING'
@@ -1350,59 +1213,54 @@ class TougeGame {
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
-    this.soundToggle.addEventListener('click', (e) => {
+    // タイトル画面：モード選択
+    this.btnTitleModeFree.addEventListener('click', (e) => {
       e.stopPropagation();
-      sound.init();
-      sound.enabled = !sound.enabled;
-      this.soundToggle.textContent = sound.enabled ? '🔊' : '🔇';
-    });
-
-    // モード選択
-    this.btnTitleModeFree.addEventListener('click', () => {
       this.setMode('FREE');
     });
-    this.btnTitleModeTouge.addEventListener('click', () => {
+    this.btnTitleModeTouge.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.setMode('TOUGE');
     });
 
-    // タイトルからゲームへ（シャッター演出遷移）
-    this.btnStartGame.addEventListener('click', () => {
-      sound.init();
+    // タイトルからゲームへ（シャッター遷移）
+    this.btnStartGame.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.triggerShutterTransition(() => {
         this.appState = 'PLAYING';
-        this.titleScreen.classList.add('hidden');
+        this.titleScreen.style.display = 'none'; // ★完全にDOMから消す！
         this.gameHud.style.display = 'flex';
         this.startRace();
       });
     });
 
-    // ゲームからタイトルへ戻る（シャッター演出遷移）
-    this.btnBackToTitle.addEventListener('click', () => {
-      sound.init();
+    // ゲームからタイトルへ戻る（シャッター遷移）
+    this.btnBackToTitle.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.triggerShutterTransition(() => {
         this.appState = 'TITLE';
         this.car.endDrift();
-        this.gameModal.classList.add('hidden');
-        this.gameHud.style.display = 'none';
-        this.titleScreen.classList.remove('hidden');
+        this.gameModal.style.display = 'none';
+        this.gameHud.style.display = 'none'; // ★完全にHUDを消す！
+        this.titleScreen.style.display = 'flex'; // ★タイトル画面を表示！
         this.drawTitleHero();
       });
     });
 
-    this.modalActionBtn.addEventListener('click', () => {
-      sound.init();
-      this.gameModal.classList.add('hidden');
+    this.modalActionBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.gameModal.style.display = 'none';
       this.startRace();
     });
 
-    this.restartBtn.addEventListener('click', () => {
+    this.restartBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.startRace();
     });
 
     // タッチ＆マウス入力
     const handleStart = (clientX, clientY) => {
       if (this.appState !== 'PLAYING') return;
-      sound.init();
 
       this.isPointerDown = true;
       const worldPos = this.screenToWorld(clientX, clientY);
@@ -1442,7 +1300,7 @@ class TougeGame {
       }
 
       if (totalPathLen < 25 || directDist < 20) {
-        const dashed = this.car.dashToward(endPt.x, endPt.y);
+        const dashed = this.car.dashToward(endPt.x, endPt.y, this.track, this.gameMode);
         this.tapIndicator = {
           x: endPt.x,
           y: endPt.y,
@@ -1451,7 +1309,7 @@ class TougeGame {
           alpha: 0.9
         };
       } else {
-        this.car.startDriftAlongPath(this.drawingPoints);
+        this.car.startDriftAlongPath(this.drawingPoints, this.track, this.gameMode);
       }
 
       this.drawingPoints = [];
@@ -1490,21 +1348,24 @@ class TougeGame {
     });
   }
 
-  // ★シャッター切り替えアニメーション
+  // ★シャッターアニメーション（display: flex / none で確実に管理）
   triggerShutterTransition(onClosedCallback) {
-    sound.playShutter();
-    this.shutterWrapper.classList.add('closed');
+    this.shutterWrapper.style.display = 'flex';
+    // 次フレームで closed クラスを付与
+    requestAnimationFrame(() => {
+      this.shutterWrapper.classList.add('closed');
 
-    // 0.32秒後（シャッターが完全に閉まった瞬間）に画面切り替え
-    setTimeout(() => {
-      if (onClosedCallback) onClosedCallback();
-
-      // さらに少し待ってからシャッターをサッと開く
       setTimeout(() => {
-        sound.playShutter();
-        this.shutterWrapper.classList.remove('closed');
-      }, 100);
-    }, 320);
+        if (onClosedCallback) onClosedCallback();
+
+        setTimeout(() => {
+          this.shutterWrapper.classList.remove('closed');
+          setTimeout(() => {
+            this.shutterWrapper.style.display = 'none';
+          }, 300);
+        }, 120);
+      }, 300);
+    });
   }
 
   setMode(mode) {
@@ -1521,7 +1382,7 @@ class TougeGame {
     if (this.gameMode === 'FREE') {
       this.timerLabel.textContent = 'FREE TEST';
       this.bestDisplay.textContent = '広場練習中';
-      this.restartBtn.textContent = '中央に戻る';
+      this.restartBtn.textContent = '位置リセット';
       this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・遮る壁なし！広々と練習<br>・離してダッシュ / 線でドリフト';
     } else {
       this.timerLabel.textContent = 'TIME ATTACK';
@@ -1548,17 +1409,14 @@ class TougeGame {
     hctx.save();
     hctx.translate(90, 45);
 
-    // アイドリング時の微細な振動
     const jitter = Math.sin(performance.now() * 0.02) * 0.8;
     hctx.translate(0, jitter);
 
-    // 影
     hctx.fillStyle = 'rgba(0,0,0,0.4)';
     hctx.beginPath();
     hctx.ellipse(3, 5, 26, 12, 0, 0, Math.PI * 2);
     hctx.fill();
 
-    // 車体（白黒ツートン）
     hctx.fillStyle = '#ffffff';
     hctx.strokeStyle = '#111';
     hctx.lineWidth = 2.2;
@@ -1566,25 +1424,18 @@ class TougeGame {
     hctx.fill();
     hctx.stroke();
 
-    // カーボンボンネット
     hctx.fillStyle = '#222';
     safeRoundRect(hctx, 4, -10, 17, 20, 3);
     hctx.fill();
 
-    // フロントガラス
     hctx.fillStyle = '#4fa3e3';
     safeRoundRect(hctx, -10, -9, 14, 18, 3);
     hctx.fill();
 
-    // ヘッドライト（点灯）
     hctx.fillStyle = '#ffeb3b';
-    hctx.shadowColor = '#ffeb3b';
-    hctx.shadowBlur = 8;
     hctx.fillRect(21, -11, 4, 6);
     hctx.fillRect(21, 5, 4, 6);
-    hctx.shadowBlur = 0;
 
-    // リアウィング
     hctx.fillStyle = '#111';
     hctx.fillRect(-23, -12, 4, 24);
 
@@ -1628,7 +1479,6 @@ class TougeGame {
 
   goalRace() {
     if (this.gameMode !== 'TOUGE') return;
-    sound.playGoal();
     const finalSec = this.elapsedTime;
     const isNewRecord = !this.bestTime || finalSec < this.bestTime;
     if (isNewRecord) {
@@ -1640,7 +1490,7 @@ class TougeGame {
     this.modalTitle.textContent = isNewRecord ? '🏆 NEW RECORD!' : '🏁 GOAL!';
     this.finalTime.textContent = this.formatTime(finalSec);
     this.maxCombo.textContent = `${Math.round(this.maxComboAchieved)} m`;
-    this.gameModal.classList.remove('hidden');
+    this.gameModal.style.display = 'flex';
   }
 
   formatTime(ms) {
@@ -1843,8 +1693,6 @@ class TougeGame {
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.shadowColor = '#00e5ff';
-    ctx.shadowBlur = 8;
 
     ctx.beginPath();
     ctx.moveTo(this.drawingPoints[0].x, this.drawingPoints[0].y);
