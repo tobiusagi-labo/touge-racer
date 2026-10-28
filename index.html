@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.5.2</div>
+        <div class="title-version">ver 0.6.0</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -485,7 +485,7 @@
           <button class="mode-opt-btn" id="btnTitleModeTouge" type="button">🏁 峠アタック</button>
         </div>
         <div class="mode-desc-text" id="titleModeDesc">
-          壁なし・全方位アスファルトでダッシュとドリフトを自由に練習
+          タップで即ダッシュ！画面をなぞって豪快にスライドドリフト！
         </div>
       </div>
 
@@ -517,8 +517,8 @@
       <div class="hud-bottom">
         <div class="guide-tip" id="guideTip">
           <strong>🎮 操作</strong><br>
-          ・離してダッシュ！（短くタップ）<br>
-          ・線を描いて離すとドリフト開始！
+          ・タップで即ダッシュ！<br>
+          ・なぞってスライドドリフト！
         </div>
         <div class="hud-bottom-right">
           <button class="action-btn" id="restartBtn" type="button">位置リセット</button>
@@ -831,6 +831,7 @@ class Car {
     this.length = 38;
 
     this.isDrifting = false;
+    this.driftTargetAngle = null;
     this.driftPath = [];
     this.driftIndex = 0;
     this.driftTimer = 0;
@@ -849,6 +850,7 @@ class Car {
     };
   }
 
+  // タップした方向へ即座にダッシュ（加速推進）
   dashToward(targetX, targetY, track, gameMode) {
     if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return false;
 
@@ -882,59 +884,20 @@ class Car {
     return true;
   }
 
-  startDriftAlongPath(rawPoints, track, gameMode) {
-    // 早期リターン：点が2個未満、または存在しない場合
-    if (!Array.isArray(rawPoints) || rawPoints.length < 2) return;
+  // なぞった方向へ車首を旋回させつつ横滑りドリフト
+  driftSteer(targetX, targetY) {
+    if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    if (Math.hypot(dx, dy) < 12) return;
 
-    // クレンジング処理（走査配列自体は変更せず、別配列 cleanPoints を作成）
-    const cleanPoints = [{ x: this.x, y: this.y }];
-    let totalLen = 0;
-
-    for (let i = 0; i < rawPoints.length; i++) {
-      let px = rawPoints[i].x;
-      let py = rawPoints[i].y;
-      if (Number.isFinite(px) && Number.isFinite(py)) {
-        if (gameMode === 'TOUGE' && track) {
-          const rel = track.getTrackRelationLocal(px, py, this.currentSegIndex);
-          const halfRoad = track.roadWidth / 2 - 12;
-          if (rel.minDist > halfRoad) {
-            const offX = px - rel.proj.x;
-            const offY = py - rel.proj.y;
-            const d = Math.hypot(offX, offY) || 0.001;
-            px = rel.proj.x + (offX / d) * halfRoad;
-            py = rel.proj.y + (offY / d) * halfRoad;
-          }
-        }
-        const last = cleanPoints[cleanPoints.length - 1];
-        const stepDist = Math.hypot(px - last.x, py - last.y);
-        // 隣り合う点の距離が 0 や極小の場合はスキップ
-        if (stepDist >= 15) {
-          cleanPoints.push({ x: px, y: py });
-          totalLen += stepDist;
-        }
-      }
-    }
-
-    // 早期リターン：有効な点が2個未満、または全長が0近傍の場合
-    if (cleanPoints.length < 2 || totalLen < 20) return;
-
-    this.driftPath = cleanPoints;
-    this.driftIndex = 1;
-    this.driftTimer = 0;
+    this.driftTargetAngle = normalizeAngle(Math.atan2(dy, dx));
     this.isDrifting = true;
-
-    const firstTarget = cleanPoints[1];
-    const ang = normalizeAngle(Math.atan2(firstTarget.y - this.y, firstTarget.x - this.x));
-    this.angle = ang;
-
-    const boostMult = 1.0 + (this.boostLevel - 1) * 0.35;
-    const power = (this.dashPowerBase * 0.95) * boostMult;
-    this.vx = Math.cos(ang) * power;
-    this.vy = Math.sin(ang) * power;
   }
 
   endDrift() {
     this.isDrifting = false;
+    this.driftTargetAngle = null;
     this.driftPath = [];
     this.driftIndex = 0;
     this.driftTimer = 0;
@@ -964,54 +927,22 @@ class Car {
 
     this.speed = Math.hypot(this.vx, this.vy);
 
-    // ドリフト制御 (while は完全不使用・有限ステップのみ)
-    if (this.isDrifting && Array.isArray(this.driftPath) && this.driftPath.length > 0) {
-      this.driftTimer += 0.016;
+    // ドリフト制御 (while は完全不使用・Math.atan2 による安全旋回)
+    if (this.isDrifting && this.driftTargetAngle !== null) {
+      // なぞった指の方向へスムーズに旋回
+      const diff = normalizeAngle(this.driftTargetAngle - this.angle);
+      this.angle = normalizeAngle(this.angle + diff * 0.22);
 
-      // タイムアウト保護（最長2.5秒）
-      if (this.driftTimer > 2.5) {
-        this.endDrift();
-      } else {
-        // 次のターゲットポイントを探す（最大5回の有限ステップ）
-        for (let step = 0; step < 5; step++) {
-          if (this.driftIndex >= this.driftPath.length) break;
-          const pt = this.driftPath[this.driftIndex];
-          if (!pt) break;
-          if (Math.hypot(pt.x - this.x, pt.y - this.y) > 35) break;
-          this.driftIndex++;
-        }
+      // 横滑り物理：車首方向へベクトルを乗せつつ、適度な慣性を保つ
+      const forwardX = Math.cos(this.angle);
+      const forwardY = Math.sin(this.angle);
+      const targetSpd = Math.max(5.2, this.speed * 0.98);
+      this.vx = this.vx * 0.86 + forwardX * targetSpd * 0.14;
+      this.vy = this.vy * 0.86 + forwardY * targetSpd * 0.14;
 
-        if (this.driftIndex < this.driftPath.length) {
-          const targetPt = this.driftPath[this.driftIndex];
-          if (targetPt && Number.isFinite(targetPt.x) && Number.isFinite(targetPt.y)) {
-            const dx = targetPt.x - this.x;
-            const dy = targetPt.y - this.y;
-            const targetDist = Math.hypot(dx, dy);
-
-            if (targetDist > 1.0) {
-              const targetAng = Math.atan2(dy, dx);
-              // ★角度正規化：while を廃止し Math.atan2(sin, cos) に完全統一
-              let diff = normalizeAngle(targetAng - this.angle);
-
-              const isNearEnd = (this.driftIndex >= this.driftPath.length - 2);
-              const turnRate = isNearEnd ? 0.12 : 0.20;
-              this.angle = normalizeAngle(this.angle + diff * turnRate);
-
-              const fX = Math.cos(this.angle);
-              const fY = Math.sin(this.angle);
-              const targetSpd = Math.max(5.5, this.speed * 0.98);
-              this.vx = this.vx * 0.85 + fX * targetSpd * 0.15;
-              this.vy = this.vy * 0.85 + fY * targetSpd * 0.15;
-
-              if (this.speed > 2.2) {
-                particles.addSkidMark(this.x, this.y, this.angle, this.width);
-                particles.addSmoke(this.x, this.y, this.angle, this.width);
-              }
-            }
-          }
-        } else {
-          this.endDrift();
-        }
+      if (this.speed > 2.0) {
+        particles.addSkidMark(this.x, this.y, this.angle, this.width);
+        particles.addSmoke(this.x, this.y, this.angle, this.width);
       }
     } else {
       // グリップ走行
@@ -1302,63 +1233,45 @@ class TougeGame {
       this.startRace();
     });
 
-    // タッチ＆マウス入力
+    // タッチ＆マウス入力（タップで即ダッシュ、なぞってドリフト）
     const handleStart = (clientX, clientY) => {
       if (this.appState !== 'PLAYING') return;
 
       this.isPointerDown = true;
       const worldPos = this.screenToWorld(clientX, clientY);
       this.drawingPoints = [worldPos];
+
+      // タップした方向へ瞬時にダッシュ！
+      const dashed = this.car.dashToward(worldPos.x, worldPos.y, this.track, this.gameMode);
+      this.tapIndicator = {
+        x: worldPos.x,
+        y: worldPos.y,
+        radius: 8,
+        color: dashed ? '#00e676' : '#ffffff',
+        alpha: 0.9
+      };
     };
 
     const handleMove = (clientX, clientY) => {
       if (!this.isPointerDown || this.appState !== 'PLAYING') return;
       const worldPos = this.screenToWorld(clientX, clientY);
 
+      // なぞった方向へ車首を旋回させつつスライドドリフト！
+      this.car.driftSteer(worldPos.x, worldPos.y);
+
       const last = this.drawingPoints[this.drawingPoints.length - 1];
-      if (!last || Math.hypot(worldPos.x - last.x, worldPos.y - last.y) > 12) {
+      if (!last || Math.hypot(worldPos.x - last.x, worldPos.y - last.y) > 10) {
         this.drawingPoints.push(worldPos);
+        if (this.drawingPoints.length > 25) {
+          this.drawingPoints.shift();
+        }
       }
     };
 
     const handleEnd = () => {
-      if (!this.isPointerDown || this.appState !== 'PLAYING') {
-        this.isPointerDown = false;
-        this.drawingPoints = [];
-        return;
-      }
+      if (!this.isPointerDown) return;
       this.isPointerDown = false;
-
-      // ★早期リターン：点が0個または1個の場合は何もしない
-      if (!Array.isArray(this.drawingPoints) || this.drawingPoints.length === 0) return;
-
-      const startPt = this.drawingPoints[0];
-      const endPt = this.drawingPoints[this.drawingPoints.length - 1];
-      const directDist = Math.hypot(endPt.x - startPt.x, endPt.y - startPt.y);
-
-      let totalPathLen = 0;
-      for (let i = 0; i < this.drawingPoints.length - 1; i++) {
-        totalPathLen += Math.hypot(
-          this.drawingPoints[i+1].x - this.drawingPoints[i].x,
-          this.drawingPoints[i+1].y - this.drawingPoints[i].y
-        );
-      }
-
-      // ★早期リターン：全長が極小、または点が少なければ「タップダッシュ」
-      if (totalPathLen < 25 || directDist < 20) {
-        const dashed = this.car.dashToward(endPt.x, endPt.y, this.track, this.gameMode);
-        this.tapIndicator = {
-          x: endPt.x,
-          y: endPt.y,
-          radius: 8,
-          color: dashed ? '#00e676' : '#ffffff',
-          alpha: 0.9
-        };
-      } else {
-        // ドリフト開始
-        this.car.startDriftAlongPath(this.drawingPoints, this.track, this.gameMode);
-      }
-
+      this.car.endDrift();
       this.drawingPoints = [];
     };
 
@@ -1428,12 +1341,12 @@ class TougeGame {
       this.timerLabel.textContent = 'FREE TEST';
       this.bestDisplay.textContent = '広場練習中';
       this.restartBtn.textContent = '位置リセット';
-      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・遮る壁なし！広々と練習<br>・離してダッシュ / 線でドリフト';
+      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで即ダッシュ！<br>・なぞってドリフト練習！';
     } else {
       this.timerLabel.textContent = 'TIME ATTACK';
       this.bestDisplay.textContent = this.bestTime ? `BEST: ${this.formatTime(this.bestTime)}` : 'BEST: --:--.--';
       this.restartBtn.textContent = 'リスタート';
-      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・ゴールまでのタイム勝負！<br>・壁衝突でコンボリセット';
+      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップ即ダッシュ/なぞってドリフト<br>・壁衝突でコンボリセット';
     }
   }
 
@@ -1639,7 +1552,6 @@ class TougeGame {
 
     this.particles.draw(ctx);
     this.renderDrawingLine(ctx);
-    this.renderActiveDriftPath(ctx);
 
     if (this.tapIndicator) {
       ctx.save();
@@ -1751,22 +1663,6 @@ class TougeGame {
     ctx.beginPath();
     ctx.arc(end.x, end.y, 5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
-  }
-
-  renderActiveDriftPath(ctx) {
-    if (!this.car.isDrifting || !Array.isArray(this.car.driftPath) || this.car.driftIndex >= this.car.driftPath.length) return;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([8, 6]);
-
-    ctx.beginPath();
-    ctx.moveTo(this.car.x, this.car.y);
-    for (let i = this.car.driftIndex; i < this.car.driftPath.length; i++) {
-      ctx.lineTo(this.car.driftPath[i].x, this.car.driftPath[i].y);
-    }
-    ctx.stroke();
     ctx.restore();
   }
 
