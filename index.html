@@ -469,7 +469,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.8.1</div>
+        <div class="title-version">ver 0.8.2</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -518,7 +518,7 @@
         <div class="guide-tip" id="guideTip">
           <strong>🎮 操作</strong><br>
           ・タップした方向へ旋回＆加速！<br>
-          ・角度差20°以上でドリフト！
+          ・角度差12°以上で氷上ドリフト！
         </div>
         <div class="hud-bottom-right">
           <button class="action-btn" id="restartBtn" type="button">位置リセット</button>
@@ -546,27 +546,35 @@
    車両・操作パラメータ定数（ここを変更して挙動を自由に調整できます）
    ========================================================================== */
 const PHYSICS_CONFIG = {
-  // 旋回速度 (ラジアン/フレーム): 車体をタップ方向へ向ける旋回力
-  TURN_SPEED: 0.082,             // 約4.7度/フレーム
+  // 車体旋回速度 (ラジアン/フレーム): 速度ベクトルより速く旋回してスリップ角を誘発
+  TURN_SPEED: 0.105,             // 約6.0度/フレーム (クイックなノーズの入り)
 
-  // グリップ係数 (毎フレーム、横方向速度にかける減衰率: 0〜1)
-  NORMAL_GRIP: 0.82,            // 通常時の強いグリップ (横滑りを素早く収束)
-  DRIFT_GRIP: 0.955,            // ドリフト時の低いグリップ (滑らかに横滑り)
+  // 基本の横方向グリップ力 (0: 完全な氷 〜 1: 瞬時に止まる)
+  // 横速度の減衰計算: vLat *= (1 - currentGrip)
+  BASE_LATERAL_GRIP: 0.10,       // 基本グリップ力 (以前の半分程度で滑りやすく)
+  DRIFT_LATERAL_GRIP: 0.02,      // ドリフト中の横グリップ力 (非常に弱く氷のように滑る)
 
-  // スリップ角のしきい値 (度): 車体向きと進行方向の差がこれを超えるとドリフト
-  SLIP_ANGLE_THRESHOLD_DEG: 20, // 20度
+  // 目標方位との角度差によるグリップ低下率 (角度差90度で基本値の30%に)
+  ANGLE_GRIP_MIN_RATIO: 0.30,
+
+  // 速度によるグリップ低下率 (最高速で基本値の60%に)
+  SPEED_GRIP_MIN_RATIO: 0.60,
+
+  // スリップ角ヒステリシス (度)
+  SLIP_ENTER_DEG: 12.0,          // 12度を超えたらドリフト突入
+  SLIP_EXIT_DEG: 5.0,            // 5度を下回ったらドリフト脱出
 
   // 推力・最高速度
-  ACCEL_POWER: 0.70,            // 毎フレームの加速推力 (車首方向)
+  ACCEL_POWER: 0.72,             // 毎フレームの加速推力 (車首方向)
   TOP_SPEED_STRAIGHT: 13.5,     // 直線ダッシュ時の最高速度
-  TOP_SPEED_DRIFT: 10.8,        // ドリフト中の最高速度 (直線の80%程度)
-  DRIFT_MIN_SPEED_RATIO: 0.80,  // ドリフト中に維持する速度比率 (ダッシュ速度の80%程度は維持)
+  TOP_SPEED_DRIFT: 11.0,        // ドリフト中最高速度
+  DRIFT_MIN_SPEED_RATIO: 0.80,  // ドリフト中に維持する速度比率 (最高速の80%程度は維持)
 
   // 1回のダッシュ最大持続時間 (秒)
   DASH_MAX_DURATION: 1.5,       // 最大1.5秒で推力OFF
 
   // 走行摩擦 (速度ベクトルにのみ作用し車首向きは変えない)
-  FRICTION: 0.985,              // 走行抵抗
+  FRICTION: 0.990,              // 走行抵抗
 };
 
 window.onerror = function(msg, url, line) {
@@ -957,9 +965,10 @@ class Car {
       }
     }
 
-    // 推力がない間は、角速度を毎フレーム大きく減衰させる(係数0.85程度)
+    // 推力がない間は、角速度を減衰させる (ドリフト中は弱め、通常時は大きめに減衰)
     if (!this.isAccelerating) {
-      this.angularVelocity *= 0.85;
+      const decay = this.isDrifting ? 0.95 : 0.85;
+      this.angularVelocity *= decay;
       if (Math.abs(this.angularVelocity) < 0.001) this.angularVelocity = 0;
       this.heading = normalizeAngle(this.heading + this.angularVelocity);
     }
@@ -969,25 +978,50 @@ class Car {
 
     // 速度が最高速の10%未満のときは、スリップ角を計算せず、グリップ係数を最大にして、ドリフト状態を解除する
     const minDriftThresholdSpeed = PHYSICS_CONFIG.TOP_SPEED_STRAIGHT * 0.10;
-    let currentGrip = PHYSICS_CONFIG.NORMAL_GRIP;
+    let currentGripPower;
 
     if (this.speed < minDriftThresholdSpeed) {
       this.slipAngle = 0;
       this.isDrifting = false;
-      currentGrip = 0; // グリップ最大 (横成分を完全減衰)
+      currentGripPower = 1.0; // グリップ最大 (横滑りを完全ゼロに抑える)
     } else {
       this.slipAngle = normalizeAngle(this.heading - moveAngle);
       const slipAngleDeg = Math.abs(this.slipAngle) * (180 / Math.PI);
 
-      if (slipAngleDeg > PHYSICS_CONFIG.SLIP_ANGLE_THRESHOLD_DEG && this.speed > 2.5) {
+      // ドリフト状態の判定にヒステリシスを設ける (12度を超えたら入り、5度を下回ったら抜ける)
+      if (!this.isDrifting && slipAngleDeg > PHYSICS_CONFIG.SLIP_ENTER_DEG) {
         this.isDrifting = true;
-        currentGrip = PHYSICS_CONFIG.DRIFT_GRIP;
+      } else if (this.isDrifting && slipAngleDeg < PHYSICS_CONFIG.SLIP_EXIT_DEG) {
+        this.isDrifting = false;
+      }
+
+      if (this.isDrifting) {
+        // ドリフト中は、横速度の減衰を非常に弱くする (氷の上のように滑る)
+        currentGripPower = PHYSICS_CONFIG.DRIFT_LATERAL_GRIP;
 
         particles.addSkidMark(this.x, this.y, this.heading, this.width);
         particles.addSmoke(this.x, this.y, this.heading, this.width);
       } else {
-        this.isDrifting = false;
-        currentGrip = PHYSICS_CONFIG.NORMAL_GRIP;
+        // グリップ走行中
+        let grip = PHYSICS_CONFIG.BASE_LATERAL_GRIP;
+
+        // 目標方位との角度差が大きいほど、グリップをさらに下げる(角度差が90度のときに基本値の30%になる程度)
+        if (this.targetPos) {
+          const dx = this.targetPos.x - this.x;
+          const dy = this.targetPos.y - this.y;
+          const targetHeading = Math.atan2(dy, dx);
+          const angleDiff = Math.abs(normalizeAngle(targetHeading - this.heading));
+          const angleRatio = Math.min(1.0, angleDiff / (Math.PI / 2));
+          const angleFactor = 1.0 - (1.0 - PHYSICS_CONFIG.ANGLE_GRIP_MIN_RATIO) * angleRatio;
+          grip *= angleFactor;
+        }
+
+        // 速度が高いほどグリップを下げる(最高速のときに基本値の60%)
+        const speedRatio = Math.min(1.0, this.speed / PHYSICS_CONFIG.TOP_SPEED_STRAIGHT);
+        const speedFactor = 1.0 - (1.0 - PHYSICS_CONFIG.SPEED_GRIP_MIN_RATIO) * speedRatio;
+        grip *= speedFactor;
+
+        currentGripPower = grip;
       }
     }
 
@@ -1006,12 +1040,12 @@ class Car {
       }
     }
 
-    // ドリフト中は速度を落としすぎない(ダッシュ速度の80%程度は維持)
-    if (this.isDrifting && this.isAccelerating) {
+    // ドリフト中は速度を落としすぎない(最高速の80%程度を維持)
+    if (this.isDrifting) {
       const minDriftSpd = PHYSICS_CONFIG.TOP_SPEED_STRAIGHT * PHYSICS_CONFIG.DRIFT_MIN_SPEED_RATIO * boostMult;
-      if (this.speed < minDriftSpd) {
-        this.vx *= 1.04;
-        this.vy *= 1.04;
+      if (this.speed > 1.0 && this.speed < minDriftSpd) {
+        this.vx *= 1.025;
+        this.vy *= 1.025;
       }
     }
 
@@ -1024,8 +1058,9 @@ class Car {
     let vLong = this.vx * headX + this.vy * headY;
     let vLat = this.vx * normX + this.vy * normY;
 
-    // 横成分をグリップ係数で減衰
-    vLat *= currentGrip;
+    // 横成分の減衰 (currentGripPower: 0で完全維持・氷 〜 1で横滑りゼロ)
+    const latRetention = Math.max(0, 1.0 - currentGripPower);
+    vLat *= latRetention;
 
     this.vx = headX * vLong + normX * vLat;
     this.vy = headY * vLong + normY * vLat;
@@ -1408,12 +1443,12 @@ class TougeGame {
       this.timerLabel.textContent = 'FREE TEST';
       this.bestDisplay.textContent = '広場練習中';
       this.restartBtn.textContent = '位置リセット';
-      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップした方向へ旋回＆加速！<br>・急旋回でスライドドリフト！';
+      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・タップで旋回＆加速！<br>・角度差12°以上で氷上ドリフト！';
     } else {
       this.timerLabel.textContent = 'TIME ATTACK';
       this.bestDisplay.textContent = this.bestTime ? `BEST: ${this.formatTime(this.bestTime)}` : 'BEST: --:--.--';
       this.restartBtn.textContent = 'リスタート';
-      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差20°以上でドリフト！';
+      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・タップで旋回＆加速！<br>・角度差12°以上で氷上ドリフト！';
     }
   }
 
