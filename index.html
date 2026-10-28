@@ -12,12 +12,13 @@
       margin: 0;
       padding: 0;
       touch-action: none;
+      -webkit-tap-highlight-color: transparent;
     }
     body, html {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #18221c;
+      background: #1a241e;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
     #game-container {
@@ -25,7 +26,7 @@
       width: 100%;
       height: 100%;
     }
-    canvas {
+    canvas#gameCanvas {
       display: block;
       width: 100%;
       height: 100%;
@@ -41,170 +42,159 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 16px;
+      padding: 14px;
     }
     .hud-top {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 12px;
+      gap: 10px;
     }
     .timer-card {
-      background: rgba(18, 25, 22, 0.85);
-      border: 2px solid #3e5c46;
-      border-radius: 12px;
-      padding: 8px 16px;
+      background: rgba(18, 25, 22, 0.88);
+      border: 1.5px solid #4a6e55;
+      border-radius: 10px;
+      padding: 6px 14px;
       color: #fff;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     .timer-label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 1px;
-      color: #92bfa0;
-      text-transform: uppercase;
+      color: #8cb898;
+      letter-spacing: 0.5px;
     }
     .timer-value {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 900;
       font-family: monospace;
       color: #ffeb3b;
-      text-shadow: 0 0 8px rgba(255, 235, 59, 0.5);
     }
     .best-time {
-      font-size: 12px;
-      color: #bbb;
-      margin-top: 2px;
+      font-size: 11px;
+      color: #aaa;
     }
-    /* Dash & Boost Gauge */
+    /* Boost Bar */
     .boost-card {
-      background: rgba(18, 25, 22, 0.85);
-      border: 2px solid #3e5c46;
-      border-radius: 12px;
-      padding: 8px 14px;
+      background: rgba(18, 25, 22, 0.88);
+      border: 1.5px solid #4a6e55;
+      border-radius: 10px;
+      padding: 6px 12px;
       color: #fff;
-      min-width: 150px;
-      backdrop-filter: blur(4px);
+      min-width: 130px;
     }
     .boost-title {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      color: #92bfa0;
+      color: #8cb898;
       display: flex;
       justify-content: space-between;
       margin-bottom: 4px;
     }
     .boost-bar-bg {
       width: 100%;
-      height: 10px;
-      background: #2b3930;
-      border-radius: 5px;
+      height: 8px;
+      background: #28372d;
+      border-radius: 4px;
       overflow: hidden;
-      position: relative;
     }
     .boost-bar-fill {
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, #00e676, #ffea00, #ff1744);
-      transition: width 0.1s linear;
-      border-radius: 5px;
+      background: linear-gradient(90deg, #00e676, #ffea00);
+      transition: width 0.08s linear;
+      border-radius: 4px;
     }
     .boost-level-text {
-      font-size: 13px;
-      font-weight: 900;
-      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-top: 3px;
       text-align: right;
       color: #00e676;
     }
-    /* Controls & Guide */
+    /* Bottom Controls */
     .hud-bottom {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
     .guide-tip {
-      background: rgba(0,0,0,0.65);
-      border-left: 4px solid #ffeb3b;
+      background: rgba(12, 18, 14, 0.85);
+      border-left: 3px solid #ffeb3b;
       border-radius: 6px;
-      padding: 8px 12px;
-      color: #eee;
-      font-size: 12px;
+      padding: 6px 10px;
+      color: #e2ede5;
+      font-size: 11px;
       line-height: 1.4;
-      max-width: 260px;
+      max-width: 230px;
     }
     .action-btn {
       pointer-events: auto;
-      background: #2d4536;
+      background: #2a4233;
       color: #fff;
-      border: 2px solid #5a8a6c;
-      padding: 10px 18px;
-      border-radius: 10px;
+      border: 1.5px solid #5a8a68;
+      padding: 8px 16px;
+      border-radius: 8px;
       font-weight: bold;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      transition: transform 0.1s, background 0.2s;
     }
     .action-btn:active {
       transform: scale(0.95);
-      background: #3e5f4b;
+      background: #395c46;
     }
-    /* Modal / Popups */
+    /* Modals */
     .modal-overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(5px);
+      background: rgba(0,0,0,0.7);
       display: flex;
       justify-content: center;
       align-items: center;
       z-index: 50;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.2s ease;
     }
     .modal-overlay.hidden {
       opacity: 0;
       pointer-events: none;
     }
     .modal-box {
-      background: #1c2b22;
-      border: 3px solid #ffeb3b;
-      border-radius: 20px;
-      padding: 24px;
-      max-width: 380px;
-      width: 90%;
+      background: #18261e;
+      border: 2px solid #ffeb3b;
+      border-radius: 16px;
+      padding: 22px;
+      max-width: 340px;
+      width: 88%;
       text-align: center;
       color: #fff;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
     }
     .modal-title {
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 900;
       color: #ffeb3b;
-      letter-spacing: 2px;
       margin-bottom: 8px;
-      text-shadow: 0 2px 10px rgba(255,235,59,0.4);
     }
     .modal-desc {
-      font-size: 13px;
-      color: #c9e0d1;
-      margin-bottom: 20px;
+      font-size: 12px;
+      color: #cad8ce;
+      margin-bottom: 16px;
       line-height: 1.6;
     }
     .modal-stats {
-      background: rgba(0,0,0,0.35);
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 18px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 16px;
     }
     .stat-row {
       display: flex;
       justify-content: space-between;
-      font-size: 14px;
-      padding: 4px 0;
+      font-size: 13px;
+      padding: 3px 0;
     }
     .stat-val {
       font-weight: bold;
@@ -215,14 +205,12 @@
       background: linear-gradient(135deg, #ffc107, #ff9800);
       color: #111;
       border: none;
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 900;
-      padding: 14px 28px;
-      border-radius: 30px;
+      padding: 12px 24px;
+      border-radius: 24px;
       cursor: pointer;
       width: 100%;
-      box-shadow: 0 6px 15px rgba(255, 152, 0, 0.4);
-      transition: transform 0.1s;
     }
     .start-btn:active {
       transform: scale(0.97);
@@ -230,37 +218,52 @@
     /* Mini-map */
     #minimap {
       position: absolute;
-      top: 16px;
-      right: 16px;
-      width: 90px;
-      height: 90px;
-      background: rgba(14, 21, 17, 0.8);
-      border: 2px solid #4a6c55;
-      border-radius: 12px;
+      top: 14px;
+      right: 14px;
+      width: 80px;
+      height: 80px;
+      background: rgba(14, 21, 17, 0.85);
+      border: 1.5px solid #4a6c55;
+      border-radius: 10px;
       pointer-events: none;
     }
-    /* Sound toggle */
     .sound-btn {
       pointer-events: auto;
       position: absolute;
-      top: 114px;
-      right: 16px;
+      top: 102px;
+      right: 14px;
       background: rgba(18, 25, 22, 0.85);
       border: 1px solid #4a6c55;
       color: #fff;
-      font-size: 16px;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
+      font-size: 14px;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
       display: flex;
       justify-content: center;
       align-items: center;
       cursor: pointer;
     }
+    /* Error Banner (万一のクラッシュ通知用) */
+    #errorBanner {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(220, 20, 60, 0.95);
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-family: monospace;
+      z-index: 999;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
 <div id="game-container">
+  <div id="errorBanner"></div>
   <canvas id="gameCanvas"></canvas>
   <canvas id="minimap"></canvas>
 
@@ -269,13 +272,13 @@
   <div class="hud">
     <div class="hud-top">
       <div class="timer-card">
-        <div class="timer-label">Time Attack</div>
+        <div class="timer-label">TIME ATTACK</div>
         <div class="timer-value" id="timerDisplay">00:00.00</div>
         <div class="best-time" id="bestDisplay">BEST: --:--.--</div>
       </div>
       <div class="boost-card">
         <div class="boost-title">
-          <span>NO-CRASH COMBO</span>
+          <span>NO-CRASH</span>
           <span id="comboDist">0m</span>
         </div>
         <div class="boost-bar-bg">
@@ -287,12 +290,11 @@
 
     <div class="hud-bottom">
       <div class="guide-tip">
-        <strong>🎮 操作方法</strong><br>
-        ・車前方タップ：ダッシュ！<br>
-        ・指でなぞる：その軌跡へドリフト！<br>
-        ・画面端をドラッグ：先読みカメラ
+        <strong>🎮 操作</strong><br>
+        ・タップ：行きたい方向へ瞬時ダッシュ！<br>
+        ・指でスライド：カーブをなぞってドリフト！
       </div>
-      <button class="action-btn" id="restartBtn">リスタート</button>
+      <button class="action-btn" id="restartBtn">やり直す</button>
     </div>
   </div>
 
@@ -301,15 +303,14 @@
     <div class="modal-box">
       <div class="modal-title" id="modalTitle">峠 TOUGE RACER</div>
       <div class="modal-desc" id="modalDesc">
-        <strong>タップでダッシュ、スライドでドリフト！</strong><br>
-        直線はダッシュ連打が最速。<br>
-        ガードレールにぶつからずに連続走行するとダッシュ速度が超進化！<br>
-        ※崖から落ちると大幅タイムロス！
+        <strong>行きたい方向をタップして一気にダッシュ！</strong><br>
+        コーナーは指でスライドしてドリフト旋回。<br>
+        壁にぶつからずに走るとダッシュスピードが加速！<br>
+        ※ガードレールのない崖からの落下に注意！
       </div>
       <div class="modal-stats" id="modalStats" style="display:none;">
         <div class="stat-row"><span>ゴールタイム:</span><span class="stat-val" id="finalTime">00:00.00</span></div>
-        <div class="stat-row"><span>最高連続距離:</span><span class="stat-val" id="maxCombo">0m</span></div>
-        <div class="stat-row"><span>最高速度:</span><span class="stat-val" id="maxSpeed">0 km/h</span></div>
+        <div class="stat-row"><span>ノーミス距離:</span><span class="stat-val" id="maxCombo">0m</span></div>
       </div>
       <button class="start-btn" id="modalActionBtn">アタック開始</button>
     </div>
@@ -317,8 +318,38 @@
 </div>
 
 <script>
+// グローバルエラー補足
+window.onerror = function(msg, url, line) {
+  const eb = document.getElementById('errorBanner');
+  if (eb) {
+    eb.style.display = 'block';
+    eb.textContent = `Error: ${msg} (Line ${line})`;
+  }
+};
+
+// 互換性安全な丸角矩形描画ヘルパー (roundRect未対応ブラウザ対応)
+function safeRoundRect(ctx, x, y, width, height, radius) {
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    return;
+  }
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.arcTo(x + width, y, x + width, y + r, r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
+  ctx.lineTo(x + r, y + height);
+  ctx.arcTo(x, y + height, x, y + height - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
 /* ==========================================================================
-   Sound Synth (Web Audio API) - No external assets required
+   Sound Synth (Web Audio API)
    ========================================================================== */
 class SoundEngine {
   constructor() {
@@ -338,178 +369,176 @@ class SoundEngine {
   }
   playDash(level = 1) {
     if (!this.enabled || !this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    const baseFreq = 180 + level * 70;
-    osc.frequency.setValueAtTime(baseFreq, t);
-    osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.5, t + 0.18);
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const baseFreq = 220 + level * 60;
+      osc.frequency.setValueAtTime(baseFreq, t);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.2, t + 0.15);
 
-    gain.gain.setValueAtTime(0.35, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.22);
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
 
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.23);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.19);
+    } catch(e){}
   }
   startDriftSound() {
     if (!this.enabled || !this.ctx || this.driftOsc) return;
-    const t = this.ctx.currentTime;
-    this.driftOsc = this.ctx.createOscillator();
-    this.driftGain = this.ctx.createGain();
-    this.driftOsc.type = 'sawtooth';
-    this.driftOsc.frequency.setValueAtTime(280, t);
-    
-    // Filter to sound like tyre squeal
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1400, t);
-    filter.Q.setValueAtTime(4.0, t);
+    try {
+      const t = this.ctx.currentTime;
+      this.driftOsc = this.ctx.createOscillator();
+      this.driftGain = this.ctx.createGain();
+      this.driftOsc.type = 'sawtooth';
+      this.driftOsc.frequency.setValueAtTime(260, t);
+      
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, t);
+      filter.Q.setValueAtTime(3.0, t);
 
-    this.driftGain.gain.setValueAtTime(0.01, t);
-    this.driftGain.gain.linearRampToValueAtTime(0.12, t + 0.08);
+      this.driftGain.gain.setValueAtTime(0.01, t);
+      this.driftGain.gain.linearRampToValueAtTime(0.08, t + 0.05);
 
-    this.driftOsc.connect(filter);
-    filter.connect(this.driftGain);
-    this.driftGain.connect(this.ctx.destination);
-    this.driftOsc.start();
+      this.driftOsc.connect(filter);
+      filter.connect(this.driftGain);
+      this.driftGain.connect(this.ctx.destination);
+      this.driftOsc.start();
+    } catch(e){}
   }
   stopDriftSound() {
     if (this.driftOsc && this.driftGain && this.ctx) {
-      const t = this.ctx.currentTime;
-      this.driftGain.gain.linearRampToValueAtTime(0.001, t + 0.08);
-      setTimeout(() => {
-        if (this.driftOsc) {
-          try { this.driftOsc.stop(); } catch(e){}
-          this.driftOsc.disconnect();
-          this.driftOsc = null;
-        }
-      }, 90);
+      try {
+        const t = this.ctx.currentTime;
+        this.driftGain.gain.linearRampToValueAtTime(0.001, t + 0.05);
+        setTimeout(() => {
+          if (this.driftOsc) {
+            try { this.driftOsc.stop(); } catch(e){}
+            this.driftOsc.disconnect();
+            this.driftOsc = null;
+          }
+        }, 60);
+      } catch(e){}
     }
   }
   playCrash() {
     if (!this.enabled || !this.ctx) return;
-    const t = this.ctx.currentTime;
-    const bufferSize = this.ctx.sampleRate * 0.25;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(500, t);
-    filter.frequency.linearRampToValueAtTime(100, t + 0.25);
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(140, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.18);
 
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.5, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
 
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.ctx.destination);
-    noise.start(t);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.21);
+    } catch(e){}
   }
   playFall() {
     if (!this.enabled || !this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(450, t);
-    osc.frequency.exponentialRampToValueAtTime(70, t + 0.6);
-
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.linearRampToValueAtTime(0.01, t + 0.6);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.61);
-  }
-  playLevelUp() {
-    if (!this.enabled || !this.ctx) return;
-    const notes = [440, 554, 659, 880];
-    notes.forEach((freq, idx) => {
-      const t = this.ctx.currentTime + idx * 0.07;
+    try {
+      const t = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0.2, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+      osc.frequency.setValueAtTime(380, t);
+      osc.frequency.exponentialRampToValueAtTime(80, t + 0.5);
+
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.linearRampToValueAtTime(0.01, t + 0.5);
+
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(t);
-      osc.stop(t + 0.13);
-    });
+      osc.stop(t + 0.51);
+    } catch(e){}
+  }
+  playLevelUp() {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      const notes = [523, 659, 784];
+      notes.forEach((freq, idx) => {
+        const t = this.ctx.currentTime + idx * 0.08;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.18, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.13);
+      });
+    } catch(e){}
   }
   playGoal() {
     if (!this.enabled || !this.ctx) return;
-    const melody = [523, 659, 784, 1046];
-    melody.forEach((freq, idx) => {
-      const t = this.ctx.currentTime + idx * 0.12;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0.3, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.36);
-    });
+    try {
+      const melody = [523, 659, 784, 1046];
+      melody.forEach((freq, idx) => {
+        const t = this.ctx.currentTime + idx * 0.12;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.25, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.31);
+      });
+    } catch(e){}
   }
 }
 const sound = new SoundEngine();
 
 /* ==========================================================================
-   Touge Track Generation
+   Touge Track Generation (広くて走りやすい峠道)
    ========================================================================== */
 class Track {
   constructor() {
     this.points = [];
-    this.roadWidth = 140; // 幅広でスマホでも遊びやすい設定
+    this.roadWidth = 240; // 道幅を140から240へ大幅拡大！スマホでも快適
     this.segments = [];
-    this.checkpoints = [];
     this.trees = [];
     this.totalLength = 0;
     this.generate();
   }
 
   generate() {
-    // 峠コースのキーウェイポイント（ヘアピン、S字、ロングストレート、崖区間）
-    // 各ポイント: {x, y, hasGuardRail: boolean}
+    // 峠コース（道幅を広げたのでカーブも気持ちよく走れるゆったり設計）
     const keyNodes = [
-      { x: 300,  y: 400,  hasGuardRail: true },  // スタート地点
-      { x: 700,  y: 400,  hasGuardRail: true },  // 最初の加速ストレート
-      { x: 1200, y: 550,  hasGuardRail: true },
-      { x: 1450, y: 900,  hasGuardRail: true },  // 高速右コーナー
-      { x: 1300, y: 1350, hasGuardRail: false }, // 崖ゾーン突入！
-      { x: 950,  y: 1550, hasGuardRail: false }, // ヘアピン崖
-      { x: 600,  y: 1350, hasGuardRail: true },  // 切り返し
-      { x: 450,  y: 1800, hasGuardRail: true },  // S字1
-      { x: 800,  y: 2150, hasGuardRail: false }, // S字2（崖）
-      { x: 1250, y: 2200, hasGuardRail: true },  // 中速コーナー
-      { x: 1650, y: 1950, hasGuardRail: false }, // 危険な高速外周崖
-      { x: 2000, y: 2250, hasGuardRail: false }, // 急激なヘアピン
-      { x: 1950, y: 2800, hasGuardRail: true },
-      { x: 1550, y: 3100, hasGuardRail: true },  // 連続コーナー
-      { x: 1050, y: 3000, hasGuardRail: false }, // 崖連続
-      { x: 650,  y: 3350, hasGuardRail: false },
-      { x: 400,  y: 3800, hasGuardRail: true },  // 最終コーナー手前
-      { x: 800,  y: 4300, hasGuardRail: true },  // 最終ロングストレート
-      { x: 1500, y: 4400, hasGuardRail: true },  // ゴールライン！
+      { x: 300,  y: 400,  hasGuardRail: true },  // スタート
+      { x: 900,  y: 400,  hasGuardRail: true },  // 最初の直線
+      { x: 1500, y: 650,  hasGuardRail: true },  // 緩やかな右
+      { x: 1800, y: 1200, hasGuardRail: false }, // 崖コーナー1
+      { x: 1450, y: 1700, hasGuardRail: false }, // ヘアピン
+      { x: 800,  y: 1600, hasGuardRail: true },
+      { x: 600,  y: 2100, hasGuardRail: true },  // S字
+      { x: 1100, y: 2500, hasGuardRail: false }, // 崖S字
+      { x: 1700, y: 2600, hasGuardRail: true },
+      { x: 2200, y: 3100, hasGuardRail: false }, // 外周崖ヘアピン
+      { x: 1900, y: 3800, hasGuardRail: true },
+      { x: 1200, y: 4000, hasGuardRail: false }, // 崖連続
+      { x: 700,  y: 4500, hasGuardRail: true },  // 最終コーナー
+      { x: 1400, y: 5000, hasGuardRail: true },  // 最終ストレート
+      { x: 2200, y: 5000, hasGuardRail: true },  // ゴール！
     ];
 
-    // Catmull-Rom スプラインでなめらかなコース点列を生成
     this.points = [];
-    const stepPerSeg = 30;
+    const stepPerSeg = 24;
     for (let i = 0; i < keyNodes.length - 1; i++) {
       const p0 = keyNodes[Math.max(0, i - 1)];
       const p1 = keyNodes[i];
@@ -520,15 +549,13 @@ class Track {
         const t = s / stepPerSeg;
         const pt = this.catmullRom(p0, p1, p2, p3, t);
         pt.hasGuardRail = t < 0.5 ? p1.hasGuardRail : p2.hasGuardRail;
-        pt.nodeIndex = i;
         this.points.push(pt);
       }
     }
-    // 終点追加
     const lastNode = keyNodes[keyNodes.length - 1];
-    this.points.push({ ...lastNode, hasGuardRail: true, nodeIndex: keyNodes.length - 1 });
+    this.points.push({ ...lastNode, hasGuardRail: true });
 
-    // 各セグメントの法線・左右境界・累積距離を計算
+    // セグメント計算
     this.segments = [];
     let accum = 0;
     for (let i = 0; i < this.points.length - 1; i++) {
@@ -536,9 +563,8 @@ class Track {
       const p2 = this.points[i + 1];
       const dx = p2.x - p1.x;
       const dy = p2.y - p1.y;
-      const dist = Math.hypot(dx, dy);
+      const dist = Math.hypot(dx, dy) || 0.001;
       const angle = Math.atan2(dy, dx);
-      // 法線（直交ベクトル）
       const nx = -dy / dist;
       const ny = dx / dist;
 
@@ -560,27 +586,18 @@ class Track {
     }
     this.totalLength = accum;
 
-    // チェックポイント（リスポーン位置）
-    this.checkpoints = keyNodes.map((n, idx) => ({
-      x: n.x,
-      y: n.y,
-      index: idx
-    }));
-
-    // 周囲の木々・山林イラスト生成
+    // 木々（道路外側に適度に配置）
     this.trees = [];
-    for (let i = 0; i < this.points.length; i += 6) {
+    for (let i = 0; i < this.points.length; i += 8) {
       const pt = this.points[i];
       const seg = this.segments[Math.min(i, this.segments.length - 1)];
-      // 道路左右の外側に木を配置
       [-1, 1].forEach(side => {
-        const offset = (this.roadWidth / 2 + 50 + Math.random() * 80) * side;
+        const offset = (this.roadWidth / 2 + 60 + Math.random() * 70) * side;
         this.trees.push({
-          x: pt.x + seg.nx * offset + (Math.random() - 0.5) * 40,
-          y: pt.y + seg.ny * offset + (Math.random() - 0.5) * 40,
-          size: 24 + Math.random() * 20,
-          color: ['#1d3b24', '#264a2f', '#18331e', '#2e5637'][Math.floor(Math.random() * 4)],
-          highlight: ['#3e734c', '#4a855a', '#346140'][Math.floor(Math.random() * 3)]
+          x: pt.x + seg.nx * offset,
+          y: pt.y + seg.ny * offset,
+          size: 26 + Math.random() * 16,
+          color: ['#1d3824', '#24452c', '#18311e'][Math.floor(Math.random() * 3)]
         });
       });
     }
@@ -599,17 +616,17 @@ class Track {
     };
   }
 
-  // 指定座標の最寄りのコースセグメントと道路内外判定
   getTrackRelation(px, py) {
     let minDist = Infinity;
     let closestSeg = null;
-    let signedDistance = 0; // 中心線からの垂直距離（正:左, 負:右）
-    let progressRatio = 0;
+    let signedDistance = 0;
 
-    for (let seg of this.segments) {
+    for (let i = 0; i < this.segments.length; i++) {
+      const seg = this.segments[i];
       const vx = px - seg.p1.x;
       const vy = py - seg.p1.y;
-      const t = Math.max(0, Math.min(1, (vx * seg.dx + vy * seg.dy) / (seg.dist * seg.dist)));
+      const segLenSq = (seg.dist * seg.dist) || 0.001;
+      const t = Math.max(0, Math.min(1, (vx * seg.dx + vy * seg.dy) / segLenSq));
       const projX = seg.p1.x + t * seg.dx;
       const projY = seg.p1.y + t * seg.dy;
       const d = Math.hypot(px - projX, py - projY);
@@ -617,26 +634,22 @@ class Track {
       if (d < minDist) {
         minDist = d;
         closestSeg = seg;
-        // 外積で符号付き距離判定
         signedDistance = (seg.dx * vy - seg.dy * vx) / seg.dist;
-        progressRatio = (seg.accumDist - seg.dist * (1 - t)) / this.totalLength;
       }
     }
 
     const halfW = this.roadWidth / 2;
-    const isInsideRoad = minDist <= halfW;
     return {
       minDist,
       closestSeg,
       signedDistance,
-      isInsideRoad,
-      progressRatio
+      isInsideRoad: minDist <= halfW
     };
   }
 }
 
 /* ==========================================================================
-   Player Car Entity & Physics
+   Player Car Entity & Physics (ハムダッシュ挙動 + ドリフト)
    ========================================================================== */
 class Car {
   constructor(startX, startY, startAngle) {
@@ -651,76 +664,60 @@ class Car {
     this.y = this.startY;
     this.vx = 0;
     this.vy = 0;
-    this.angle = this.startAngle; // 車首の向き（ラジアン）
-    this.angularVelocity = 0;
+    this.angle = this.startAngle;
     this.speed = 0;
 
-    this.width = 24;
-    this.length = 46;
+    // 車体サイズをコンパクトに（28x15：道が広く走りやすい）
+    this.width = 15;
+    this.length = 28;
 
-    // 状態
     this.isDrifting = false;
-    this.driftDirection = 0; // -1: 左, 1: 右
-    this.driftTrajectory = []; // なぞった軌道の点列
+    this.driftTargetAngle = null;
 
-    this.state = 'ALIVE'; // 'ALIVE', 'FALLING', 'CRASHED'
+    this.state = 'ALIVE'; // 'ALIVE', 'FALLING'
     this.fallScale = 1.0;
     this.fallTimer = 0;
 
-    // スピードアップ（コンボ）
     this.noCrashDistance = 0;
-    this.boostLevel = 1; // 1, 2, 3 (MAX)
-    this.maxSpeedBase = 11.0;
-    this.dashPowerBase = 12.0;
+    this.boostLevel = 1; // 1, 2, 3
+    this.dashPowerBase = 11.5;
 
     this.respawnCheckpoint = { x: this.startX, y: this.startY, angle: this.startAngle };
   }
 
-  // ダッシュ実行（車の前方をタップ時）
+  // ハムダッシュ挙動：タップされた地点の方向へ瞬時に向き、ダイレクトに加速ダッシュ！
   dashToward(targetX, targetY) {
-    if (this.state !== 'ALIVE') return;
+    if (this.state !== 'ALIVE') return false;
 
-    // タップ位置へのベクトル
     const dx = targetX - this.x;
     const dy = targetY - this.y;
     const dist = Math.hypot(dx, dy);
-    if (dist < 15) return;
+    if (dist < 10) return false;
 
-    // 目標角度
-    const targetAngle = Math.atan2(dy, dx);
+    // タップされた方向へ瞬時に方向転換
+    this.angle = Math.atan2(dy, dx);
 
-    // 車の前方かどうかの判定（角度差が120度以内なら有効）
-    let diffAngle = targetAngle - this.angle;
-    while (diffAngle > Math.PI) diffAngle -= Math.PI * 2;
-    while (diffAngle < -Math.PI) diffAngle += Math.PI * 2;
+    // レベルに応じた加速
+    const boostMult = 1.0 + (this.boostLevel - 1) * 0.4;
+    const power = this.dashPowerBase * boostMult;
 
-    if (Math.abs(diffAngle) < Math.PI * 0.7) {
-      // ダッシュ発動！
-      // 向きをタップ方向にキュッと向ける
-      this.angle = this.angle + diffAngle * 0.65;
-      
-      // レベルに応じた加速力
-      const boostMultiplier = 1.0 + (this.boostLevel - 1) * 0.45;
-      const power = this.dashPowerBase * boostMultiplier;
+    // 直線的な推進力を注入（キビキビとしたレスポンス）
+    this.vx = Math.cos(this.angle) * power;
+    this.vy = Math.sin(this.angle) * power;
 
-      // 瞬間的に推進力を注入（慣性と合算）
-      const forwardX = Math.cos(this.angle) * power;
-      const forwardY = Math.sin(this.angle) * power;
-
-      this.vx = this.vx * 0.4 + forwardX;
-      this.vy = this.vy * 0.4 + forwardY;
-
-      sound.playDash(this.boostLevel);
-      return true;
-    }
-    return false;
+    sound.playDash(this.boostLevel);
+    return true;
   }
 
-  // スライドドリフトの軌跡設定
-  setDriftPath(points) {
+  // スライドドリフト：なぞった方向へ車首を旋回させつつ横滑り
+  driftSteer(targetX, targetY) {
     if (this.state !== 'ALIVE') return;
-    this.driftTrajectory = points;
-    if (points.length > 2 && !this.isDrifting) {
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    if (Math.hypot(dx, dy) < 15) return;
+
+    this.driftTargetAngle = Math.atan2(dy, dx);
+    if (!this.isDrifting) {
       this.isDrifting = true;
       sound.startDriftSound();
     }
@@ -729,7 +726,7 @@ class Car {
   endDrift() {
     if (this.isDrifting) {
       this.isDrifting = false;
-      this.driftTrajectory = [];
+      this.driftTargetAngle = null;
       sound.stopDriftSound();
     }
   }
@@ -737,138 +734,110 @@ class Car {
   update(track, particles) {
     if (this.state === 'FALLING') {
       this.fallTimer += 0.016;
-      this.fallScale = Math.max(0, 1.0 - this.fallTimer * 1.5);
-      this.angle += 0.15;
-      this.vx *= 0.95;
-      this.vy *= 0.95;
+      this.fallScale = Math.max(0, 1.0 - this.fallTimer * 1.6);
+      this.angle += 0.2;
+      this.vx *= 0.94;
+      this.vy *= 0.94;
       this.x += this.vx;
       this.y += this.vy;
 
-      if (this.fallTimer > 0.8) {
+      if (this.fallTimer > 0.7) {
         this.respawn();
       }
       return;
     }
 
-    // 速度計算
     this.speed = Math.hypot(this.vx, this.vy);
 
-    // ドリフト制御
-    if (this.isDrifting && this.driftTrajectory.length > 0) {
-      // 軌道ポイントのうち、車より少し先にある目標点を探す
-      let targetPt = null;
-      for (let i = 0; i < this.driftTrajectory.length; i++) {
-        const pt = this.driftTrajectory[i];
-        const dist = Math.hypot(pt.x - this.x, pt.y - this.y);
-        if (dist > 30) {
-          targetPt = pt;
-          break;
-        }
-      }
-      if (!targetPt && this.driftTrajectory.length > 0) {
-        targetPt = this.driftTrajectory[this.driftTrajectory.length - 1];
-      }
+    // ドリフト旋回
+    if (this.isDrifting && this.driftTargetAngle !== null) {
+      let diff = this.driftTargetAngle - this.angle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff -= Math.PI * 2;
 
-      if (targetPt) {
-        const targetAng = Math.atan2(targetPt.y - this.y, targetPt.x - this.x);
-        let diff = targetAng - this.angle;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff -= Math.PI * 2;
+      // なめらかに旋回
+      this.angle += diff * 0.22;
 
-        // ドリフト旋回：車体を急角度で傾ける（カウンターステア効果）
-        this.angle += diff * 0.16;
-        
-        // 速度ベクトルをやや外側に逃がしつつ推進（横滑り物理）
-        const slipFactor = 0.82;
-        const targetVx = Math.cos(this.angle) * this.speed * 0.98;
-        const targetVy = Math.sin(this.angle) * this.speed * 0.98;
-        this.vx = this.vx * slipFactor + targetVx * (1 - slipFactor);
-        this.vy = this.vy * slipFactor + targetVy * (1 - slipFactor);
-
-        // タイヤスモーク & スキッドマーク
-        if (this.speed > 3) {
-          particles.addSkidMark(this.x, this.y, this.angle, this.width);
-          particles.addSmoke(this.x, this.y, this.angle, this.width);
-        }
-      }
-    } else {
-      // 通常走行（グリップ）：進行方向と車首方向のズレを解消
+      // 横滑り物理（少し外側に流れつつ進行）
       const forwardX = Math.cos(this.angle);
       const forwardY = Math.sin(this.angle);
-      const dot = this.vx * forwardX + this.vy * forwardY;
+      this.vx = this.vx * 0.88 + forwardX * this.speed * 0.12;
+      this.vy = this.vy * 0.88 + forwardY * this.speed * 0.12;
 
-      // 横滑り成分を強力に消してグリップ旋回
-      this.vx = forwardX * dot * 0.96;
-      this.vy = forwardY * dot * 0.96;
+      if (this.speed > 2.5) {
+        particles.addSkidMark(this.x, this.y, this.angle, this.width);
+        particles.addSmoke(this.x, this.y, this.angle, this.width);
+      }
+    } else {
+      // 通常走行（グリップ）：車首方向に進む
+      if (this.speed > 0.5) {
+        const forwardX = Math.cos(this.angle);
+        const forwardY = Math.sin(this.angle);
+        const dot = this.vx * forwardX + this.vy * forwardY;
+        this.vx = forwardX * dot * 0.96;
+        this.vy = forwardY * dot * 0.96;
+      }
     }
 
-    // 摩擦・空気抵抗
-    const friction = this.isDrifting ? 0.988 : 0.982;
-    this.vx *= friction;
-    this.vy *= friction;
+    // 自然減速（適度な慣性を保ちつつ滑らかに減速）
+    this.vx *= 0.985;
+    this.vy *= 0.985;
 
-    // 移動適用
     this.x += this.vx;
     this.y += this.vy;
 
-    // コンボ距離加算（ぶつからずに走った距離）
-    if (this.speed > 1.5) {
-      const moved = Math.hypot(this.vx, this.vy);
-      this.noCrashDistance += moved;
-
-      // ブーストレベル昇格判定 (100m -> Lv2, 250m -> Lv3 MAX)
-      if (this.boostLevel === 1 && this.noCrashDistance > 800) {
+    // コンボ加算
+    if (this.speed > 1.2) {
+      this.noCrashDistance += this.speed;
+      if (this.boostLevel === 1 && this.noCrashDistance > 600) {
         this.boostLevel = 2;
         sound.playLevelUp();
-        particles.addLevelUpBurst(this.x, this.y, '#ffea00');
-      } else if (this.boostLevel === 2 && this.noCrashDistance > 2000) {
+      } else if (this.boostLevel === 2 && this.noCrashDistance > 1600) {
         this.boostLevel = 3;
         sound.playLevelUp();
-        particles.addLevelUpBurst(this.x, this.y, '#ff1744');
       }
     }
 
-    // コース判定
-    this.checkTrackCollision(track, particles);
+    // 衝突＆落下判定
+    this.checkCollision(track, particles);
   }
 
-  checkTrackCollision(track, particles) {
+  checkCollision(track, particles) {
     const rel = track.getTrackRelation(this.x, this.y);
     const halfRoad = track.roadWidth / 2;
 
-    // コース境界からの距離
     if (!rel.isInsideRoad) {
       const seg = rel.closestSeg;
       if (seg) {
         if (seg.hasGuardRail) {
-          // ガードレール衝突：跳ね返り＆減速＆コンボリセット
+          // ガードレール衝突
           sound.playCrash();
           particles.addSparks(this.x, this.y, -seg.nx, -seg.ny);
 
-          // 法線方向に反発
-          const pushDist = (rel.minDist - halfRoad) + 6;
+          // 押し戻し
+          const pushDist = (rel.minDist - halfRoad) + 5;
           const sign = rel.signedDistance >= 0 ? 1 : -1;
           this.x += seg.nx * pushDist * sign;
           this.y += seg.ny * pushDist * sign;
 
-          // 速度反転＆半減
-          this.vx = -this.vx * 0.45;
-          this.vy = -this.vy * 0.45;
+          // 反射＆減速
+          this.vx = -this.vx * 0.35;
+          this.vy = -this.vy * 0.35;
 
           // コンボリセット
           this.boostLevel = 1;
           this.noCrashDistance = 0;
           this.endDrift();
         } else {
-          // 崖ゾーン：ガードレールがないため落下！
-          if (rel.minDist > halfRoad + 12) {
+          // 崖落下
+          if (rel.minDist > halfRoad + 10) {
             this.triggerFall();
           }
         }
       }
     } else {
-      // 道路上：最寄りのセグメントをリスポーン地点として更新
-      if (rel.closestSeg && this.speed > 2) {
+      // 道路上：安全なリスポーン地点を更新
+      if (rel.closestSeg && this.speed > 1.5) {
         this.respawnCheckpoint = {
           x: rel.closestSeg.p1.x,
           y: rel.closestSeg.p1.y,
@@ -894,20 +863,20 @@ class Car {
     this.x = this.respawnCheckpoint.x;
     this.y = this.respawnCheckpoint.y;
     this.angle = this.respawnCheckpoint.angle;
-    this.vx = Math.cos(this.angle) * 3;
-    this.vy = Math.sin(this.angle) * 3;
-    this.speed = 3;
+    this.vx = Math.cos(this.angle) * 2.5;
+    this.vy = Math.sin(this.angle) * 2.5;
+    this.speed = 2.5;
   }
 }
 
 /* ==========================================================================
-   Particles & Visual FX (Skidmarks, Smoke, Sparks, Speed lines)
+   Clean & Lightweight Particle System (シンプル・軽量)
    ========================================================================== */
 class ParticleSystem {
   constructor() {
     this.particles = [];
     this.skidMarks = [];
-    this.maxSkid = 400;
+    this.maxSkid = 150;
   }
 
   addSkidMark(x, y, angle, carWidth) {
@@ -919,7 +888,7 @@ class ParticleSystem {
       y1: y + sin * offset,
       x2: x - cos * offset,
       y2: y - sin * offset,
-      alpha: 0.65
+      alpha: 0.35
     });
     if (this.skidMarks.length > this.maxSkid) {
       this.skidMarks.shift();
@@ -927,26 +896,25 @@ class ParticleSystem {
   }
 
   addSmoke(x, y, angle, carWidth) {
-    for (let i = 0; i < 2; i++) {
-      const cos = Math.cos(angle + Math.PI);
-      const sin = Math.sin(angle + Math.PI);
-      this.particles.push({
-        type: 'smoke',
-        x: x + cos * 15 + (Math.random() - 0.5) * carWidth,
-        y: y + sin * 15 + (Math.random() - 0.5) * carWidth,
-        vx: cos * 2 + (Math.random() - 0.5) * 2,
-        vy: sin * 2 + (Math.random() - 0.5) * 2,
-        size: 7 + Math.random() * 8,
-        alpha: 0.7,
-        decay: 0.03 + Math.random() * 0.02
-      });
-    }
+    if (Math.random() < 0.6) return; // 発生頻度を抑えてスッキリ
+    const cos = Math.cos(angle + Math.PI);
+    const sin = Math.sin(angle + Math.PI);
+    this.particles.push({
+      type: 'smoke',
+      x: x + cos * 10 + (Math.random() - 0.5) * carWidth,
+      y: y + sin * 10 + (Math.random() - 0.5) * carWidth,
+      vx: cos * 1.2 + (Math.random() - 0.5),
+      vy: sin * 1.2 + (Math.random() - 0.5),
+      size: 4 + Math.random() * 4,
+      alpha: 0.5,
+      decay: 0.04
+    });
   }
 
   addSparks(x, y, nx, ny) {
-    for (let i = 0; i < 15; i++) {
-      const speed = 4 + Math.random() * 7;
-      const spread = (Math.random() - 0.5) * 1.5;
+    for (let i = 0; i < 8; i++) {
+      const speed = 3 + Math.random() * 5;
+      const spread = (Math.random() - 0.5) * 1.2;
       const angle = Math.atan2(ny, nx) + spread;
       this.particles.push({
         type: 'spark',
@@ -954,27 +922,9 @@ class ParticleSystem {
         y: y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: 2.5 + Math.random() * 2,
-        alpha: 1.0,
-        decay: 0.06 + Math.random() * 0.04
-      });
-    }
-  }
-
-  addLevelUpBurst(x, y, color) {
-    for (let i = 0; i < 28; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const spd = 3 + Math.random() * 8;
-      this.particles.push({
-        type: 'burst',
-        x: x,
-        y: y,
-        vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd,
-        color: color,
-        size: 4 + Math.random() * 3,
-        alpha: 1.0,
-        decay: 0.04
+        size: 2,
+        alpha: 0.9,
+        decay: 0.08
       });
     }
   }
@@ -985,54 +935,43 @@ class ParticleSystem {
       p.x += p.vx;
       p.y += p.vy;
       p.alpha -= p.decay;
-      if (p.type === 'smoke') {
-        p.size += 0.5;
-      }
       if (p.alpha <= 0) {
         this.particles.splice(i, 1);
       }
     }
   }
 
-  drawSkidMarks(ctx) {
-    if (this.skidMarks.length < 2) return;
-    ctx.strokeStyle = '#1e2420';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < this.skidMarks.length; i++) {
-      const s = this.skidMarks[i];
-      ctx.globalAlpha = s.alpha * 0.45;
-      ctx.beginPath();
-      ctx.arc(s.x1, s.y1, 2, 0, Math.PI * 2);
-      ctx.arc(s.x2, s.y2, 2, 0, Math.PI * 2);
-      ctx.fillStyle = '#111';
-      ctx.fill();
+  draw(ctx) {
+    // 控えめなスキッドマーク
+    if (this.skidMarks.length > 0) {
+      ctx.fillStyle = '#1c221e';
+      for (let i = 0; i < this.skidMarks.length; i++) {
+        const s = this.skidMarks[i];
+        ctx.globalAlpha = s.alpha;
+        ctx.beginPath();
+        ctx.arc(s.x1, s.y1, 1.5, 0, Math.PI * 2);
+        ctx.arc(s.x2, s.y2, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    ctx.globalAlpha = 1.0;
-  }
 
-  drawParticles(ctx) {
-    for (let p of this.particles) {
-      ctx.save();
+    // 粒子
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
       ctx.globalAlpha = Math.max(0, p.alpha);
       if (p.type === 'smoke') {
-        ctx.fillStyle = '#e0eae2';
+        ctx.fillStyle = '#ccdcd1';
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
       } else if (p.type === 'spark') {
-        ctx.fillStyle = '#ffea00';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (p.type === 'burst') {
-        ctx.fillStyle = p.color || '#00e676';
+        ctx.fillStyle = '#ffeb3b';
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.restore();
     }
+    ctx.globalAlpha = 1.0;
   }
 }
 
@@ -1048,41 +987,32 @@ class TougeGame {
 
     this.track = new Track();
     const startNode = this.track.points[0];
-    const secondNode = this.track.points[5];
+    const secondNode = this.track.points[4];
     const initialAngle = Math.atan2(secondNode.y - startNode.y, secondNode.x - startNode.x);
 
     this.car = new Car(startNode.x, startNode.y, initialAngle);
     this.particles = new ParticleSystem();
 
-    // カメラ
+    // カメラ（進行方向への適度な先読み）
     this.camera = {
       x: startNode.x,
-      y: startNode.y,
-      offsetX: 0,
-      offsetY: 0,
-      scale: 1.0
+      y: startNode.y
     };
 
-    // タッチ＆入力管理
-    this.touchStart = null;
-    this.currentTouch = null;
-    this.touchPoints = [];
-    this.isPanMode = false; // コース外スライドによるカメラ先読みパン
-    this.tapIndicator = null; // タップ地点の波紋演出
+    // タップ演出（小さな波紋のみ）
+    this.tapIndicator = null;
 
-    // タイムアタック＆ゲーム状態
-    this.gameState = 'READY'; // 'READY', 'RUNNING', 'GOAL'
+    // ゲーム状態
+    this.gameState = 'READY';
     this.startTime = 0;
     this.elapsedTime = 0;
     this.bestTime = localStorage.getItem('touge_best_time') || null;
-    this.maxSpeedAchieved = 0;
     this.maxComboAchieved = 0;
 
     this.initDOM();
     this.initEvents();
     this.resize();
     this.updateHUD();
-    this.drawMinimapStatic();
 
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -1099,7 +1029,6 @@ class TougeGame {
     this.modalStats = document.getElementById('modalStats');
     this.finalTime = document.getElementById('finalTime');
     this.maxCombo = document.getElementById('maxCombo');
-    this.maxSpeed = document.getElementById('maxSpeed');
     this.modalActionBtn = document.getElementById('modalActionBtn');
     this.restartBtn = document.getElementById('restartBtn');
     this.soundToggle = document.getElementById('soundToggle');
@@ -1112,7 +1041,6 @@ class TougeGame {
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
-    // サウンド切替
     this.soundToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       sound.init();
@@ -1120,100 +1048,80 @@ class TougeGame {
       this.soundToggle.textContent = sound.enabled ? '🔊' : '🔇';
     });
 
-    // モーダルボタン
     this.modalActionBtn.addEventListener('click', () => {
       sound.init();
       this.gameModal.classList.add('hidden');
       this.startRace();
     });
 
-    // リスタートボタン
     this.restartBtn.addEventListener('click', () => {
       this.resetRace();
     });
 
-    // タッチ＆マウス入力
-    const handleDown = (screenX, screenY) => {
+    // タッチ＆マウス入力（画面のどこでも直感的にタップダッシュ＆スライドドリフト）
+    const handleStart = (clientX, clientY) => {
       sound.init();
       if (this.gameState !== 'RUNNING') return;
 
-      const worldPos = this.screenToWorld(screenX, screenY);
-      this.touchStart = { x: screenX, y: screenY, worldX: worldPos.x, worldY: worldPos.y, time: performance.now() };
-      this.touchPoints = [{ x: worldPos.x, y: worldPos.y }];
+      const worldPos = this.screenToWorld(clientX, clientY);
+      const dashed = this.car.dashToward(worldPos.x, worldPos.y);
 
-      // タップが「自車の周辺（車操作エリア）」か「コース外・画面端（視点移動エリア）」か判定
-      const distToCar = Math.hypot(worldPos.x - this.car.x, worldPos.y - this.car.y);
-      if (distToCar > 260) {
-        this.isPanMode = true;
-      } else {
-        this.isPanMode = false;
-        // まずタップダッシュを試行
-        const dashed = this.car.dashToward(worldPos.x, worldPos.y);
-        this.tapIndicator = {
-          x: worldPos.x,
-          y: worldPos.y,
-          radius: 10,
-          maxRadius: dashed ? 38 : 22,
-          color: dashed ? '#00e676' : '#ffffff',
-          alpha: 1.0
-        };
-      }
+      this.tapIndicator = {
+        x: worldPos.x,
+        y: worldPos.y,
+        radius: 8,
+        color: dashed ? '#00e676' : '#ffffff',
+        alpha: 0.9
+      };
     };
 
-    const handleMove = (screenX, screenY) => {
-      if (!this.touchStart || this.gameState !== 'RUNNING') return;
-      const worldPos = this.screenToWorld(screenX, screenY);
-
-      if (this.isPanMode) {
-        // カメラの先読みオフセット
-        const dx = (screenX - this.touchStart.x);
-        const dy = (screenY - this.touchStart.y);
-        this.camera.offsetX = -dx * 1.5;
-        this.camera.offsetY = -dy * 1.5;
-      } else {
-        // スライド軌道（ドリフト入力）
-        this.touchPoints.push({ x: worldPos.x, y: worldPos.y });
-        if (this.touchPoints.length > 2) {
-          this.car.setDriftPath(this.touchPoints);
-        }
-      }
+    const handleMove = (clientX, clientY) => {
+      if (this.gameState !== 'RUNNING') return;
+      const worldPos = this.screenToWorld(clientX, clientY);
+      this.car.driftSteer(worldPos.x, worldPos.y);
     };
 
-    const handleUp = () => {
-      if (!this.touchStart) return;
+    const handleEnd = () => {
       this.car.endDrift();
-      this.touchStart = null;
-      this.touchPoints = [];
-      this.isPanMode = false;
     };
 
     // タッチイベント
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      const t = e.touches[0];
-      handleDown(t.clientX, t.clientY);
+      const t = (e.changedTouches && e.changedTouches[0]) || e.touches[0];
+      if (t) handleStart(t.clientX, t.clientY);
     }, { passive: false });
 
     this.canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
-      const t = e.touches[0];
-      handleMove(t.clientX, t.clientY);
+      const t = (e.changedTouches && e.changedTouches[0]) || e.touches[0];
+      if (t) handleMove(t.clientX, t.clientY);
     }, { passive: false });
 
     this.canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
-      handleUp();
+      handleEnd();
     }, { passive: false });
 
-    // マウスイベント（PCデバッグ用）
+    this.canvas.addEventListener('touchcancel', (e) => {
+      e.preventDefault();
+      handleEnd();
+    }, { passive: false });
+
+    // PCマウスイベント
+    let isMouseDown = false;
     this.canvas.addEventListener('mousedown', (e) => {
-      handleDown(e.clientX, e.clientY);
+      isMouseDown = true;
+      handleStart(e.clientX, e.clientY);
     });
     window.addEventListener('mousemove', (e) => {
-      handleMove(e.clientX, e.clientY);
+      if (isMouseDown) handleMove(e.clientX, e.clientY);
     });
     window.addEventListener('mouseup', () => {
-      handleUp();
+      if (isMouseDown) {
+        isMouseDown = false;
+        handleEnd();
+      }
     });
   }
 
@@ -1222,16 +1130,16 @@ class TougeGame {
     this.height = window.innerHeight;
     this.canvas.width = this.width;
     this.canvas.height = this.height;
-    this.minimapCanvas.width = 90;
-    this.minimapCanvas.height = 90;
+    this.minimapCanvas.width = 80;
+    this.minimapCanvas.height = 80;
   }
 
   screenToWorld(sx, sy) {
     const cx = this.width / 2;
     const cy = this.height / 2;
     return {
-      x: (sx - cx) + this.camera.x + this.camera.offsetX,
-      y: (sy - cy) + this.camera.y + this.camera.offsetY
+      x: (sx - cx) + this.camera.x,
+      y: (sy - cy) + this.camera.y
     };
   }
 
@@ -1239,15 +1147,12 @@ class TougeGame {
     this.gameState = 'RUNNING';
     this.startTime = performance.now();
     this.elapsedTime = 0;
-    this.maxSpeedAchieved = 0;
     this.maxComboAchieved = 0;
   }
 
   resetRace() {
     this.car.reset();
     this.gameState = 'READY';
-    this.camera.offsetX = 0;
-    this.camera.offsetY = 0;
     this.timerDisplay.textContent = '00:00.00';
     this.modalTitle.textContent = '峠 TOUGE RACER';
     this.modalDesc.style.display = 'block';
@@ -1272,7 +1177,6 @@ class TougeGame {
     this.modalStats.style.display = 'block';
     this.finalTime.textContent = this.formatTime(finalSec);
     this.maxCombo.textContent = `${Math.round(this.maxComboAchieved)} m`;
-    this.maxSpeed.textContent = `${Math.round(this.maxSpeedAchieved * 18)} km/h`;
     this.modalActionBtn.textContent = 'もう一度走る';
     this.gameModal.classList.remove('hidden');
   }
@@ -1290,12 +1194,11 @@ class TougeGame {
       this.elapsedTime = performance.now() - this.startTime;
       this.timerDisplay.textContent = this.formatTime(this.elapsedTime);
 
-      const speedKm = this.car.speed * 18;
-      if (speedKm > this.maxSpeedAchieved) this.maxSpeedAchieved = speedKm;
-      if (this.car.noCrashDistance > this.maxComboAchieved) this.maxComboAchieved = this.car.noCrashDistance;
+      if (this.car.noCrashDistance > this.maxComboAchieved) {
+        this.maxComboAchieved = this.car.noCrashDistance;
+      }
 
-      // コンボメーター
-      const targetDist = this.car.boostLevel === 1 ? 800 : (this.car.boostLevel === 2 ? 2000 : 2000);
+      const targetDist = this.car.boostLevel === 1 ? 600 : 1600;
       const ratio = Math.min(1.0, this.car.noCrashDistance / targetDist);
       this.boostFill.style.width = `${ratio * 100}%`;
       this.comboDist.textContent = `${Math.round(this.car.noCrashDistance)}m`;
@@ -1306,10 +1209,19 @@ class TougeGame {
     }
   }
 
-  loop(timestamp) {
-    this.update();
-    this.render();
-    requestAnimationFrame((t) => this.loop(t));
+  loop() {
+    try {
+      this.update();
+      this.render();
+    } catch(err) {
+      console.error(err);
+      const eb = document.getElementById('errorBanner');
+      if (eb) {
+        eb.style.display = 'block';
+        eb.textContent = `Loop error: ${err.message}`;
+      }
+    }
+    requestAnimationFrame(() => this.loop());
   }
 
   update() {
@@ -1318,30 +1230,26 @@ class TougeGame {
       this.particles.update();
       this.updateHUD();
 
-      // ゴール判定（最後のポイント付近）
+      // ゴール判定
       const lastPt = this.track.points[this.track.points.length - 1];
-      const distToGoal = Math.hypot(this.car.x - lastPt.x, this.car.y - lastPt.y);
-      if (distToGoal < 90) {
+      if (Math.hypot(this.car.x - lastPt.x, this.car.y - lastPt.y) < 120) {
         this.goalRace();
       }
     }
 
-    // カメラのスムーズ追従
-    const targetCamX = this.car.x;
-    const targetCamY = this.car.y;
+    // カメラ追従（車の進行方向に少しだけ先読みオフセット）
+    const leadX = Math.cos(this.car.angle) * (this.car.speed * 8);
+    const leadY = Math.sin(this.car.angle) * (this.car.speed * 8);
+    const targetCamX = this.car.x + leadX;
+    const targetCamY = this.car.y + leadY;
+
     this.camera.x += (targetCamX - this.camera.x) * 0.12;
     this.camera.y += (targetCamY - this.camera.y) * 0.12;
 
-    // 先読みパンの復帰（指を離したら徐々に中央に戻る）
-    if (!this.isPanMode) {
-      this.camera.offsetX *= 0.88;
-      this.camera.offsetY *= 0.88;
-    }
-
-    // タップ波紋の減衰
+    // タップ波紋
     if (this.tapIndicator) {
-      this.tapIndicator.radius += 2.0;
-      this.tapIndicator.alpha -= 0.05;
+      this.tapIndicator.radius += 1.8;
+      this.tapIndicator.alpha -= 0.06;
       if (this.tapIndicator.alpha <= 0) this.tapIndicator = null;
     }
   }
@@ -1351,122 +1259,89 @@ class TougeGame {
     ctx.clearRect(0, 0, this.width, this.height);
 
     ctx.save();
-    // カメラトランスフォーム
     const cx = this.width / 2;
     const cy = this.height / 2;
-    ctx.translate(cx - (this.camera.x + this.camera.offsetX), cy - (this.camera.y + this.camera.offsetY));
+    ctx.translate(cx - this.camera.x, cy - this.camera.y);
 
-    // 1. 背景の山肌・地面描画
-    this.renderTerrain(ctx);
+    // 1. 地面（シンプルな深い緑）
+    ctx.fillStyle = '#1c2820';
+    ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
 
-    // 2. コース（アスファルト、縁石、白線、ガードレール、崖）
+    // 2. コース道路
     this.renderTrack(ctx);
 
-    // 3. タイヤ痕
-    this.particles.drawSkidMarks(ctx);
+    // 3. タイヤ痕＆粒子
+    this.particles.draw(ctx);
 
-    // 4. ドリフト軌道ガイド（指でなぞったライン）
-    this.renderDriftGuide(ctx);
-
-    // 5. タップエフェクト
+    // 4. タップ波紋
     if (this.tapIndicator) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.tapIndicator.alpha);
       ctx.strokeStyle = this.tapIndicator.color;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.arc(this.tapIndicator.x, this.tapIndicator.y, this.tapIndicator.radius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
 
-    // 6. 車両本体
+    // 5. 車両
     this.renderCar(ctx);
 
-    // 7. エフェクト粒子（煙・火花）
-    this.particles.drawParticles(ctx);
-
-    // 8. 道路沿いのイラスト木々（車より手前に立体感を持たせる）
+    // 6. 木々
     this.renderTrees(ctx);
 
     ctx.restore();
 
-    // 9. 画面端のスピード線（最高速ブースト時）
-    if (this.car.boostLevel >= 2 && this.car.speed > 8) {
-      this.renderSpeedLines(ctx);
-    }
-
-    // 10. ミニマップ更新
+    // 7. ミニマップ
     this.renderMinimap();
-  }
-
-  renderTerrain(ctx) {
-    // 峠の深い山林グラウンド
-    ctx.fillStyle = '#1e2d24';
-    ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
-
-    // イラスト風の山肌等高線パターン
-    ctx.strokeStyle = '#25382d';
-    ctx.lineWidth = 18;
-    ctx.beginPath();
-    for (let i = -1000; i < 6000; i += 300) {
-      ctx.moveTo(-1000, i);
-      ctx.lineTo(4000, i + 800);
-    }
-    ctx.stroke();
   }
 
   renderTrack(ctx) {
     const pts = this.track.points;
     if (pts.length < 2) return;
 
-    // A. 道路の土台・路肩（砂利エッジ）
+    // A. 道路の土台（路肩）
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.strokeStyle = '#323d35';
-    ctx.lineWidth = this.track.roadWidth + 30;
+    ctx.strokeStyle = '#2b362e';
+    ctx.lineWidth = this.track.roadWidth + 20;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // B. アスファルト舗装面
-    ctx.strokeStyle = '#484f4a';
+    // B. アスファルト
+    ctx.strokeStyle = '#3e4641';
     ctx.lineWidth = this.track.roadWidth;
     ctx.stroke();
 
-    // C. センターライン（破線・イラスト風）
+    // C. センターライン
     ctx.save();
-    ctx.setLineDash([25, 20]);
-    ctx.strokeStyle = '#ffeb3b';
-    ctx.lineWidth = 4;
+    ctx.setLineDash([30, 25]);
+    ctx.strokeStyle = '#f5df4d';
+    ctx.lineWidth = 3.5;
     ctx.stroke();
     ctx.restore();
 
-    // D. ガードレール & 崖の境界線
-    for (let seg of this.track.segments) {
+    // D. ガードレール & 崖境界
+    for (let i = 0; i < this.track.segments.length; i++) {
+      const seg = this.track.segments[i];
       if (seg.hasGuardRail) {
-        // ガードレール：クッキリした白＆シルバーの帯
-        ctx.strokeStyle = '#e0e6e2';
-        ctx.lineWidth = 6;
+        // 白のガードレール
+        ctx.strokeStyle = '#e2ebe4';
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(seg.left1.x, seg.left1.y);
         ctx.lineTo(seg.left2.x, seg.left2.y);
         ctx.moveTo(seg.right1.x, seg.right1.y);
         ctx.lineTo(seg.right2.x, seg.right2.y);
         ctx.stroke();
-
-        // 支柱（ボルト点）
-        ctx.fillStyle = '#ff1744';
-        ctx.beginPath();
-        ctx.arc(seg.left1.x, seg.left1.y, 3, 0, Math.PI * 2);
-        ctx.arc(seg.right1.x, seg.right1.y, 3, 0, Math.PI * 2);
-        ctx.fill();
       } else {
-        // 崖ゾーン：赤黒の警戒ストライプ＆シャドウ
-        ctx.strokeStyle = '#d50000';
-        ctx.lineWidth = 4;
-        ctx.setLineDash([12, 12]);
+        // 崖ゾーン（赤破線）
+        ctx.strokeStyle = '#e53935';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 10]);
         ctx.beginPath();
         ctx.moveTo(seg.left1.x, seg.left1.y);
         ctx.lineTo(seg.left2.x, seg.left2.y);
@@ -1490,71 +1365,38 @@ class TougeGame {
     ctx.rotate(seg.angle + Math.PI / 2);
     const halfW = this.track.roadWidth / 2;
 
-    // チェッカーフラッグ模様
-    const numChecks = 10;
+    const numChecks = 12;
     const checkW = (halfW * 2) / numChecks;
     for (let i = 0; i < numChecks; i++) {
       ctx.fillStyle = (i % 2 === 0) ? '#ffffff' : '#111111';
-      ctx.fillRect(-halfW + i * checkW, -8, checkW, 16);
+      ctx.fillRect(-halfW + i * checkW, -6, checkW, 12);
     }
 
-    // ラベル
     ctx.fillStyle = '#ffeb3b';
-    ctx.font = 'bold 12px monospace';
+    ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(label, 0, -14);
+    ctx.fillText(label, 0, -12);
     ctx.restore();
   }
 
   renderTrees(ctx) {
-    for (let t of this.track.trees) {
-      // 画面内にある木のみ描画（カリング最適化）
+    for (let i = 0; i < this.track.trees.length; i++) {
+      const t = this.track.trees[i];
       if (Math.abs(t.x - this.camera.x) > this.width || Math.abs(t.y - this.camera.y) > this.height) continue;
 
       ctx.save();
       ctx.translate(t.x, t.y);
-      // 影
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
       ctx.beginPath();
-      ctx.ellipse(4, 6, t.size * 0.9, t.size * 0.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(3, 4, t.size * 0.9, t.size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 木の幹＆葉（イラスト調ポップな多角形/円）
       ctx.fillStyle = t.color;
       ctx.beginPath();
       ctx.arc(0, 0, t.size, 0, Math.PI * 2);
       ctx.fill();
-
-      // ハイライト
-      ctx.fillStyle = t.highlight;
-      ctx.beginPath();
-      ctx.arc(-t.size * 0.25, -t.size * 0.25, t.size * 0.55, 0, Math.PI * 2);
-      ctx.fill();
       ctx.restore();
     }
-  }
-
-  renderDriftGuide(ctx) {
-    if (this.car.driftTrajectory.length < 2) return;
-    ctx.save();
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.setLineDash([8, 8]);
-    ctx.beginPath();
-    ctx.moveTo(this.car.driftTrajectory[0].x, this.car.driftTrajectory[0].y);
-    for (let i = 1; i < this.car.driftTrajectory.length; i++) {
-      ctx.lineTo(this.car.driftTrajectory[i].x, this.car.driftTrajectory[i].y);
-    }
-    ctx.stroke();
-
-    // 軌道終点のターゲットマーカー
-    const endPt = this.car.driftTrajectory[this.car.driftTrajectory.length - 1];
-    ctx.fillStyle = '#00e5ff';
-    ctx.beginPath();
-    ctx.arc(endPt.x, endPt.y, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
   }
 
   renderCar(ctx) {
@@ -1564,124 +1406,92 @@ class TougeGame {
     ctx.rotate(car.angle);
     ctx.scale(car.fallScale, car.fallScale);
 
-    // 車両の影
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.roundRect(-car.length/2 + 3, -car.width/2 + 5, car.length, car.width, 6);
+    // 影
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    safeRoundRect(ctx, -car.length/2 + 2, -car.width/2 + 3, car.length, car.width, 4);
     ctx.fill();
 
-    // 車体カラー（イラスト調白黒ツートン＋カーボンボンネット）
-    // メインボディ
+    // メインボディ（白・イラスト調）
     ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.roundRect(-car.length/2, -car.width/2, car.length, car.width, 5);
+    ctx.strokeStyle = '#181818';
+    ctx.lineWidth = 1.8;
+    safeRoundRect(ctx, -car.length/2, -car.width/2, car.length, car.width, 3);
     ctx.fill();
     ctx.stroke();
 
     // カーボンボンネット（黒）
     ctx.fillStyle = '#222222';
-    ctx.beginPath();
-    ctx.roundRect(car.length * 0.1, -car.width * 0.4, car.length * 0.35, car.width * 0.8, 3);
+    safeRoundRect(ctx, car.length * 0.08, -car.width * 0.38, car.length * 0.36, car.width * 0.76, 2);
     ctx.fill();
 
-    // フロントガラス＆ルーフ
-    ctx.fillStyle = '#59a2ff';
-    ctx.beginPath();
-    ctx.roundRect(-car.length * 0.2, -car.width * 0.35, car.length * 0.35, car.width * 0.7, 3);
+    // フロントガラス（青）
+    ctx.fillStyle = '#4fa3e3';
+    safeRoundRect(ctx, -car.length * 0.18, -car.width * 0.34, car.length * 0.32, car.width * 0.68, 2);
     ctx.fill();
-    ctx.stroke();
 
-    // ヘッドライト（黄色ポップ）
+    // ヘッドライト（黄）
     ctx.fillStyle = '#ffeb3b';
-    ctx.fillRect(car.length * 0.45, -car.width * 0.42, 4, 6);
-    ctx.fillRect(car.length * 0.45, car.width * 0.42 - 6, 4, 6);
+    ctx.fillRect(car.length * 0.44, -car.width * 0.42, 3, 4);
+    ctx.fillRect(car.length * 0.44, car.width * 0.42 - 4, 3, 4);
 
     // テールランプ（赤）
     ctx.fillStyle = '#ff1744';
-    ctx.fillRect(-car.length * 0.48, -car.width * 0.4, 3, 5);
-    ctx.fillRect(-car.length * 0.48, car.width * 0.4 - 5, 3, 5);
+    ctx.fillRect(-car.length * 0.48, -car.width * 0.38, 2.5, 4);
+    ctx.fillRect(-car.length * 0.48, car.width * 0.4 - 4, 2.5, 4);
 
     // リアウィング
     ctx.fillStyle = '#111';
-    ctx.fillRect(-car.length * 0.46, -car.width * 0.46, 5, car.width * 0.92);
+    ctx.fillRect(-car.length * 0.46, -car.width * 0.44, 3, car.width * 0.88);
 
-    // ブーストレベルエフェクト（オーラ）
+    // ブースト中のかすかな光
     if (car.boostLevel >= 2) {
       ctx.strokeStyle = car.boostLevel === 3 ? '#ff1744' : '#ffea00';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(-car.length/2 - 4, -car.width/2 - 4, car.length + 8, car.width + 8, 8);
+      ctx.lineWidth = 2;
+      safeRoundRect(ctx, -car.length/2 - 2, -car.width/2 - 2, car.length + 4, car.width + 4, 5);
       ctx.stroke();
     }
 
     ctx.restore();
-  }
-
-  renderSpeedLines(ctx) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 2;
-    const numLines = 16;
-    for (let i = 0; i < numLines; i++) {
-      const x = Math.random() * this.width;
-      const y = Math.random() * this.height;
-      const len = 40 + Math.random() * 80;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + len, y);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  drawMinimapStatic() {
-    // 峠全体の縮尺を計算してミニマップに常時描画
-    const mCtx = this.minimapCtx;
-    mCtx.clearRect(0, 0, 90, 90);
   }
 
   renderMinimap() {
     const mCtx = this.minimapCtx;
-    mCtx.clearRect(0, 0, 90, 90);
+    mCtx.clearRect(0, 0, 80, 80);
 
-    // コース境界ボックス
-    const minX = 0, maxX = 2400;
-    const minY = 200, maxY = 4600;
-    const mapScaleX = 75 / (maxX - minX);
-    const mapScaleY = 75 / (maxY - minY);
+    const minX = 100, maxX = 2400;
+    const minY = 200, maxY = 5200;
+    const scaleX = 66 / (maxX - minX);
+    const scaleY = 66 / (maxY - minY);
 
     mCtx.save();
-    mCtx.translate(8, 8);
+    mCtx.translate(7, 7);
 
-    // コースライン
-    mCtx.strokeStyle = '#5c7865';
-    mCtx.lineWidth = 4;
+    // コース
+    mCtx.strokeStyle = '#506c58';
+    mCtx.lineWidth = 3.5;
     mCtx.lineCap = 'round';
     mCtx.beginPath();
     const pts = this.track.points;
-    for (let i = 0; i < pts.length; i += 3) {
-      const mx = (pts[i].x - minX) * mapScaleX;
-      const my = (pts[i].y - minY) * mapScaleY;
+    for (let i = 0; i < pts.length; i += 4) {
+      const mx = (pts[i].x - minX) * scaleX;
+      const my = (pts[i].y - minY) * scaleY;
       if (i === 0) mCtx.moveTo(mx, my);
       else mCtx.lineTo(mx, my);
     }
     mCtx.stroke();
 
-    // 自車位置マーカー
-    const carMx = (this.car.x - minX) * mapScaleX;
-    const carMy = (this.car.y - minY) * mapScaleY;
+    // 自車マーカー
+    const carMx = (this.car.x - minX) * scaleX;
+    const carMy = (this.car.y - minY) * scaleY;
     mCtx.fillStyle = '#ff1744';
     mCtx.beginPath();
-    mCtx.arc(carMx, carMy, 4, 0, Math.PI * 2);
+    mCtx.arc(carMx, carMy, 3, 0, Math.PI * 2);
     mCtx.fill();
 
     mCtx.restore();
   }
 }
 
-// 起動
 window.addEventListener('DOMContentLoaded', () => {
   new TougeGame();
 });
