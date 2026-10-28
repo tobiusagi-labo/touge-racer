@@ -151,6 +151,28 @@
       color: #00e676;
     }
 
+    /* Mode Badge & Switcher on HUD */
+    .mode-pill {
+      pointer-events: auto;
+      background: rgba(0, 229, 255, 0.2);
+      border: 1.5px solid #00e5ff;
+      color: #00e5ff;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 4px 10px;
+      border-radius: 14px;
+      cursor: pointer;
+      display: inline-block;
+      margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(0, 229, 255, 0.3);
+    }
+    .mode-pill.touge {
+      background: rgba(255, 235, 59, 0.2);
+      border-color: #ffeb3b;
+      color: #ffeb3b;
+      box-shadow: 0 2px 8px rgba(255, 235, 59, 0.3);
+    }
+
     /* Bottom Controls */
     .hud-bottom {
       display: flex;
@@ -202,7 +224,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.72);
+      background: rgba(0,0,0,0.75);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -250,6 +272,33 @@
       margin-bottom: 14px;
       line-height: 1.5;
     }
+    
+    /* Mode Select Radio Buttons */
+    .mode-select-wrap {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .mode-select-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border-radius: 10px;
+      border: 2px solid #4a6c55;
+      background: rgba(0,0,0,0.4);
+      color: #ccc;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: all 0.15s ease;
+    }
+    .mode-select-btn.active {
+      background: #2a5238;
+      border-color: #00e676;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(0,230,118,0.3);
+    }
+
     .modal-stats {
       background: rgba(0,0,0,0.35);
       border-radius: 8px;
@@ -340,9 +389,10 @@
     <div class="hud">
       <div class="hud-top">
         <div class="timer-card">
-          <div class="timer-label">TIME ATTACK</div>
-          <div class="timer-value" id="timerDisplay">00:00.00</div>
-          <div class="best-time" id="bestDisplay">BEST: --:--.--</div>
+          <div class="timer-label" id="timerLabel">FREE TEST</div>
+          <div class="timer-value" id="timerDisplay">0 km/h</div>
+          <div class="best-time" id="bestDisplay">広場モード</div>
+          <button class="mode-pill" id="modeSwitchPill">モード変更 ⇄</button>
         </div>
         <div class="boost-card">
           <div class="boost-title">
@@ -357,14 +407,14 @@
       </div>
 
       <div class="hud-bottom">
-        <div class="guide-tip">
-          <strong>🎮 操作</strong><br>
+        <div class="guide-tip" id="guideTip">
+          <strong>🎮 広場テスト操作</strong><br>
           ・離してダッシュ！（短くタップ）<br>
           ・線を描いて離すとドリフト開始！
         </div>
         <div class="hud-bottom-right">
-          <button class="action-btn" id="restartBtn">やり直す</button>
-          <div class="hud-ver-label">ver 0.3.1</div>
+          <button class="action-btn" id="restartBtn">位置リセット</button>
+          <div class="hud-ver-label">ver 0.4.0</div>
         </div>
       </div>
     </div>
@@ -372,19 +422,26 @@
     <!-- Start / Goal Modal -->
     <div class="modal-overlay" id="gameModal">
       <div class="modal-box">
-        <div class="modal-ver-badge">ver 0.3.1</div>
+        <div class="modal-ver-badge">ver 0.4.0</div>
         <div class="modal-title" id="modalTitle">峠 TOUGE RACER</div>
         <div class="modal-desc" id="modalDesc">
-          <strong>【離して発動！】</strong><br>
-          ・短くタップして<strong>離すとその方向へダッシュ！</strong><br>
-          ・カーブを描いて<strong>離すとラインに沿ってドリフト突撃！</strong><br>
-          ※壁にぶつかっても安全に跳ね返り、そのまま走り続けられます！
+          プレイするモードを選択してください
         </div>
+
+        <div class="mode-select-wrap">
+          <button class="mode-select-btn active" id="btnModeFree">
+            🏟️ 広場テスト<br><small style="font-weight:normal;opacity:0.8;">壁なし・自由に練習</small>
+          </button>
+          <button class="mode-select-btn" id="btnModeTouge">
+            🏁 峠アタック<br><small style="font-weight:normal;opacity:0.8;">タイムアタック</small>
+          </button>
+        </div>
+
         <div class="modal-stats" id="modalStats" style="display:none;">
           <div class="stat-row"><span>ゴールタイム:</span><span class="stat-val" id="finalTime">00:00.00</span></div>
           <div class="stat-row"><span>ノーミス距離:</span><span class="stat-val" id="maxCombo">0m</span></div>
         </div>
-        <button class="start-btn" id="modalActionBtn">アタック開始</button>
+        <button class="start-btn" id="modalActionBtn">スタート</button>
       </div>
     </div>
   </div>
@@ -414,7 +471,7 @@ function safeRoundRect(ctx, x, y, width, height, radius) {
   ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
   ctx.lineTo(x + r, y + height);
   ctx.arcTo(x, y + height, x, y + height - r, r);
-  ctx.lineTo(x, y + r);
+  ctx.lineTo(x + r, y);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
@@ -663,7 +720,6 @@ class Track {
     };
   }
 
-  // 中心線への投影点と距離を安定して取得
   getTrackRelation(px, py) {
     let minDist = Infinity;
     let closestSeg = null;
@@ -697,6 +753,73 @@ class Track {
 }
 
 /* ==========================================================================
+   Skidpad / Free Test Area (広場テスト用環境)
+   ========================================================================== */
+class SkidpadArea {
+  constructor() {
+    this.radius = 2200; // 巨大な円形広場
+    this.cones = [];
+    this.generateCones();
+  }
+
+  generateCones() {
+    this.cones = [];
+    // 中央の旋回練習用コーンサークル（半径120px、250px、400px）
+    [100, 220, 360].forEach(r => {
+      const count = Math.floor(r / 25);
+      for (let i = 0; i < count; i++) {
+        const ang = (i / count) * Math.PI * 2;
+        this.cones.push({
+          x: Math.cos(ang) * r,
+          y: Math.sin(ang) * r,
+          color: '#ff9800'
+        });
+      }
+    });
+
+    // スラローム用パイロン列
+    for (let y = -500; y <= 500; y += 140) {
+      this.cones.push({ x: 650, y, color: '#ffeb3b' });
+      this.cones.push({ x: -650, y, color: '#ffeb3b' });
+    }
+
+    // 外周フェンス沿いのコーン
+    const outerCount = 60;
+    for (let i = 0; i < outerCount; i++) {
+      const ang = (i / outerCount) * Math.PI * 2;
+      this.cones.push({
+        x: Math.cos(ang) * (this.radius - 30),
+        y: Math.sin(ang) * (this.radius - 30),
+        color: '#ff1744'
+      });
+    }
+  }
+
+  checkCollision(car, particles) {
+    const dist = Math.hypot(car.x, car.y);
+    if (dist > this.radius - 40) {
+      // 外周フェンスでの跳ね返り
+      const ang = Math.atan2(car.y, car.x);
+      car.x = Math.cos(ang) * (this.radius - 40);
+      car.y = Math.sin(ang) * (this.radius - 40);
+
+      const nx = Math.cos(ang);
+      const ny = Math.sin(ang);
+      const normalVel = car.vx * nx + car.vy * ny;
+      if (normalVel > 0) {
+        sound.playCrash();
+        particles.addSparks(car.x, car.y, -nx, -ny);
+        car.vx -= normalVel * 1.3;
+        car.vy -= normalVel * 1.3;
+        car.vx *= 0.6;
+        car.vy *= 0.6;
+        if (car.isDrifting) car.isDrifting = false;
+      }
+    }
+  }
+}
+
+/* ==========================================================================
    Player Car Entity & Physics
    ========================================================================== */
 class Car {
@@ -707,12 +830,12 @@ class Car {
     this.reset();
   }
 
-  reset() {
-    this.x = this.startX;
-    this.y = this.startY;
+  reset(x = this.startX, y = this.startY, angle = this.startAngle) {
+    this.x = x;
+    this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.angle = this.startAngle;
+    this.angle = angle;
     this.speed = 0;
 
     this.width = 20;
@@ -727,7 +850,6 @@ class Car {
     this.dashPowerBase = 12.0;
   }
 
-  // 「離したらダッシュ！」
   dashToward(targetX, targetY) {
     const dx = targetX - this.x;
     const dy = targetY - this.y;
@@ -747,18 +869,14 @@ class Car {
     return true;
   }
 
-  // 「離したら描いた線に沿ってドリフト開始！」
   startDriftAlongPath(rawPoints) {
     if (!rawPoints || rawPoints.length < 2) return;
 
-    // 自車の位置から繋がる滑らかなポイント列を構築
     const points = [{ x: this.x, y: this.y }, ...rawPoints];
-
     this.driftPath = points;
-    this.driftIndex = 1; // 最初の目的地へ
+    this.driftIndex = 1;
     this.isDrifting = true;
 
-    // 最初の進行方向に向けて加速
     const firstTarget = points[1];
     const ang = Math.atan2(firstTarget.y - this.y, firstTarget.x - this.x);
     this.angle = ang;
@@ -771,22 +889,18 @@ class Car {
     sound.startDriftSound();
   }
 
-  update(track, particles) {
+  update(gameMode, track, skidpad, particles) {
     this.speed = Math.hypot(this.vx, this.vy);
 
-    // ドリフト制御（逆向き・終点スピン対策済み）
+    // ドリフト制御
     if (this.isDrifting && this.driftPath.length > 0) {
-      // 自車より前にある有効な目標点を探す
       while (this.driftIndex < this.driftPath.length) {
         const pt = this.driftPath[this.driftIndex];
         const dist = Math.hypot(pt.x - this.x, pt.y - this.y);
-        
-        // すでに通過したか、十分近づいたポイントは次に進める
         if (dist > 30) break;
         this.driftIndex++;
       }
 
-      // 残りの点がある場合
       if (this.driftIndex < this.driftPath.length) {
         const targetPt = this.driftPath[this.driftIndex];
         const targetAng = Math.atan2(targetPt.y - this.y, targetPt.x - this.x);
@@ -794,12 +908,10 @@ class Car {
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff -= Math.PI * 2;
 
-        // 終点付近（ラスト2点）では角速度を抑制してスピンを防止！
         const isNearEnd = (this.driftIndex >= this.driftPath.length - 2);
         const turnRate = isNearEnd ? 0.14 : 0.22;
         this.angle += diff * turnRate;
 
-        // スピードを維持しつつ推進
         const fX = Math.cos(this.angle);
         const fY = Math.sin(this.angle);
         const targetSpd = Math.max(5.5, this.speed * 0.98);
@@ -811,13 +923,11 @@ class Car {
           particles.addSmoke(this.x, this.y, this.angle, this.width);
         }
       } else {
-        // ドリフト終了：スピンせずスムーズに前を向いてグリップ復帰
         this.isDrifting = false;
         this.driftPath = [];
         sound.stopDriftSound();
       }
     } else {
-      // 通常走行（グリップ）：車首方向へ滑らかに推進
       if (this.speed > 0.5) {
         const forwardX = Math.cos(this.angle);
         const forwardY = Math.sin(this.angle);
@@ -827,7 +937,6 @@ class Car {
       }
     }
 
-    // 自然減速
     const friction = this.isDrifting ? 0.99 : 0.985;
     this.vx *= friction;
     this.vy *= friction;
@@ -835,7 +944,6 @@ class Car {
     this.x += this.vx;
     this.y += this.vy;
 
-    // コンボ加算
     if (this.speed > 1.2) {
       this.noCrashDistance += this.speed;
       if (this.boostLevel === 1 && this.noCrashDistance > 600) {
@@ -847,48 +955,42 @@ class Car {
       }
     }
 
-    // 壁衝突＆確実な境界クランプ判定（絶対に進行不能にならない！）
-    this.checkCollision(track, particles);
+    if (gameMode === 'TOUGE') {
+      this.checkTougeCollision(track, particles);
+    } else {
+      skidpad.checkCollision(this, particles);
+    }
   }
 
-  // ★重要改善：壁の押し戻しを完全な道路内側クランプに変更
-  checkCollision(track, particles) {
+  checkTougeCollision(track, particles) {
     const rel = track.getTrackRelation(this.x, this.y);
     const halfRoad = track.roadWidth / 2;
-    const safeLimit = halfRoad - 8; // 安全な内側マージン
+    const safeLimit = halfRoad - 8;
 
-    // コース境界を越えた場合
     if (rel.minDist > safeLimit) {
       const proj = rel.proj;
       const offX = this.x - proj.x;
       const offY = this.y - proj.y;
       const dist = Math.hypot(offX, offY) || 0.001;
 
-      // 1. 車両位置を中心線から safeLimit の位置に「道路の内側へ確実に引き戻す」
-      // （※外側に押し出される心配が物理的にゼロになります！）
       this.x = proj.x + (offX / dist) * safeLimit;
       this.y = proj.y + (offY / dist) * safeLimit;
 
-      // 2. 壁に向かう速度成分（法線方向速度）のみを打ち消して反射
       const nx = offX / dist;
       const ny = offY / dist;
       const normalVel = this.vx * nx + this.vy * ny;
 
-      if (normalVel > 0) { // 外側に向かって進んでいる場合
+      if (normalVel > 0) {
         sound.playCrash();
         particles.addSparks(this.x, this.y, -nx, -ny);
 
-        // 壁に向かう速度を跳ね返し、接線（道路沿い）の速度は残す（壁沿いに滑れる）
         this.vx -= normalVel * 1.3;
         this.vy -= normalVel * 1.3;
-
-        // 速度半減＆コンボリセット
         this.vx *= 0.55;
         this.vy *= 0.55;
         this.boostLevel = 1;
         this.noCrashDistance = 0;
 
-        // ドリフト中なら中断
         if (this.isDrifting) {
           this.isDrifting = false;
           this.driftPath = [];
@@ -1014,19 +1116,15 @@ class TougeGame {
     this.minimapCanvas = document.getElementById('minimap');
     this.minimapCtx = this.minimapCanvas.getContext('2d');
 
+    this.gameMode = 'FREE'; // デフォルト：広場テストモード ('FREE' or 'TOUGE')
     this.track = new Track();
-    const startNode = this.track.points[0];
-    const secondNode = this.track.points[4];
-    const initialAngle = Math.atan2(secondNode.y - startNode.y, secondNode.x - startNode.x);
+    this.skidpad = new SkidpadArea();
 
-    this.car = new Car(startNode.x, startNode.y, initialAngle);
+    // 車両の初期化（広場モードは中央 (0,0) でスタート）
+    this.car = new Car(0, 0, 0);
     this.particles = new ParticleSystem();
 
-    this.camera = {
-      x: startNode.x,
-      y: startNode.y
-    };
-
+    this.camera = { x: 0, y: 0 };
     this.drawingPoints = [];
     this.isPointerDown = false;
     this.tapIndicator = null;
@@ -1040,14 +1138,17 @@ class TougeGame {
     this.initDOM();
     this.initEvents();
     this.resize();
-    this.updateHUD();
+    this.updateHUDModeUI();
 
     requestAnimationFrame(() => this.loop());
   }
 
   initDOM() {
+    this.timerLabel = document.getElementById('timerLabel');
     this.timerDisplay = document.getElementById('timerDisplay');
     this.bestDisplay = document.getElementById('bestDisplay');
+    this.modeSwitchPill = document.getElementById('modeSwitchPill');
+    this.guideTip = document.getElementById('guideTip');
     this.boostFill = document.getElementById('boostFill');
     this.boostLevelText = document.getElementById('boostLevelText');
     this.comboDist = document.getElementById('comboDist');
@@ -1058,6 +1159,8 @@ class TougeGame {
     this.finalTime = document.getElementById('finalTime');
     this.maxCombo = document.getElementById('maxCombo');
     this.modalActionBtn = document.getElementById('modalActionBtn');
+    this.btnModeFree = document.getElementById('btnModeFree');
+    this.btnModeTouge = document.getElementById('btnModeTouge');
     this.restartBtn = document.getElementById('restartBtn');
     this.soundToggle = document.getElementById('soundToggle');
 
@@ -1074,6 +1177,22 @@ class TougeGame {
       sound.init();
       sound.enabled = !sound.enabled;
       this.soundToggle.textContent = sound.enabled ? '🔊' : '🔇';
+    });
+
+    // モード選択ボタン（モーダル内）
+    this.btnModeFree.addEventListener('click', () => {
+      this.setMode('FREE');
+    });
+    this.btnModeTouge.addEventListener('click', () => {
+      this.setMode('TOUGE');
+    });
+
+    // HUDのモード切替ピル
+    this.modeSwitchPill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.init();
+      this.setMode(this.gameMode === 'FREE' ? 'TOUGE' : 'FREE');
+      this.resetRace();
     });
 
     this.modalActionBtn.addEventListener('click', () => {
@@ -1127,7 +1246,6 @@ class TougeGame {
         );
       }
 
-      // 短いタップの場合は「離したらダッシュ！」
       if (totalPathLen < 25 || directDist < 20) {
         const dashed = this.car.dashToward(endPt.x, endPt.y);
         this.tapIndicator = {
@@ -1138,14 +1256,12 @@ class TougeGame {
           alpha: 0.9
         };
       } else {
-        // 線を引いて離した場合は「ドリフト開始！」
         this.car.startDriftAlongPath(this.drawingPoints);
       }
 
       this.drawingPoints = [];
     };
 
-    // タッチ
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const t = (e.changedTouches && e.changedTouches[0]) || e.touches[0];
@@ -1168,7 +1284,6 @@ class TougeGame {
       handleEnd();
     }, { passive: false });
 
-    // PCマウス
     this.canvas.addEventListener('mousedown', (e) => {
       handleStart(e.clientX, e.clientY);
     });
@@ -1178,6 +1293,31 @@ class TougeGame {
     window.addEventListener('mouseup', () => {
       handleEnd();
     });
+  }
+
+  setMode(mode) {
+    this.gameMode = mode;
+    this.btnModeFree.classList.toggle('active', mode === 'FREE');
+    this.btnModeTouge.classList.toggle('active', mode === 'TOUGE');
+    this.updateHUDModeUI();
+  }
+
+  updateHUDModeUI() {
+    if (this.gameMode === 'FREE') {
+      this.timerLabel.textContent = 'FREE TEST';
+      this.modeSwitchPill.textContent = '🏁 峠コースへ';
+      this.modeSwitchPill.className = 'mode-pill';
+      this.bestDisplay.textContent = '広場練習中';
+      this.restartBtn.textContent = '中央に戻る';
+      this.guideTip.innerHTML = '<strong>🏟️ 広場テスト</strong><br>・遮る壁なし！広々と練習<br>・離してダッシュ / 線でドリフト';
+    } else {
+      this.timerLabel.textContent = 'TIME ATTACK';
+      this.modeSwitchPill.textContent = '🏟️ 広場テストへ';
+      this.modeSwitchPill.className = 'mode-pill touge';
+      this.bestDisplay.textContent = this.bestTime ? `BEST: ${this.formatTime(this.bestTime)}` : 'BEST: --:--.--';
+      this.restartBtn.textContent = 'リスタート';
+      this.guideTip.innerHTML = '<strong>🏁 峠アタック</strong><br>・ゴールまでのタイム勝負！<br>・壁衝突でコンボリセット';
+    }
   }
 
   resize() {
@@ -1207,22 +1347,39 @@ class TougeGame {
     this.startTime = performance.now();
     this.elapsedTime = 0;
     this.maxComboAchieved = 0;
+    this.applyModeSpawn();
+  }
+
+  applyModeSpawn() {
+    if (this.gameMode === 'FREE') {
+      this.car.reset(0, 0, 0);
+      this.camera.x = 0;
+      this.camera.y = 0;
+    } else {
+      const startNode = this.track.points[0];
+      const secondNode = this.track.points[4];
+      const initialAngle = Math.atan2(secondNode.y - startNode.y, secondNode.x - startNode.x);
+      this.car.reset(startNode.x, startNode.y, initialAngle);
+      this.camera.x = startNode.x;
+      this.camera.y = startNode.y;
+    }
   }
 
   resetRace() {
-    this.car.reset();
+    this.applyModeSpawn();
     this.gameState = 'READY';
     this.drawingPoints = [];
     this.isPointerDown = false;
-    this.timerDisplay.textContent = '00:00.00';
-    this.modalTitle.textContent = '峠 TOUGE RACER';
+    this.modalTitle.textContent = this.gameMode === 'FREE' ? '🏟️ 広場テスト' : '🏁 峠レース';
     this.modalDesc.style.display = 'block';
     this.modalStats.style.display = 'none';
-    this.modalActionBtn.textContent = 'アタック開始';
+    this.modalActionBtn.textContent = 'スタート';
     this.gameModal.classList.remove('hidden');
+    this.updateHUDModeUI();
   }
 
   goalRace() {
+    if (this.gameMode !== 'TOUGE') return;
     this.gameState = 'GOAL';
     sound.playGoal();
     const finalSec = this.elapsedTime;
@@ -1252,8 +1409,14 @@ class TougeGame {
 
   updateHUD() {
     if (this.gameState === 'RUNNING') {
-      this.elapsedTime = performance.now() - this.startTime;
-      this.timerDisplay.textContent = this.formatTime(this.elapsedTime);
+      if (this.gameMode === 'TOUGE') {
+        this.elapsedTime = performance.now() - this.startTime;
+        this.timerDisplay.textContent = this.formatTime(this.elapsedTime);
+      } else {
+        // 広場テストモードでは現在の走行スピードを表示
+        const speedKm = Math.round(this.car.speed * 18);
+        this.timerDisplay.textContent = `${speedKm} km/h`;
+      }
 
       if (this.car.noCrashDistance > this.maxComboAchieved) {
         this.maxComboAchieved = this.car.noCrashDistance;
@@ -1287,13 +1450,15 @@ class TougeGame {
 
   update() {
     if (this.gameState === 'RUNNING') {
-      this.car.update(this.track, this.particles);
+      this.car.update(this.gameMode, this.track, this.skidpad, this.particles);
       this.particles.update();
       this.updateHUD();
 
-      const lastPt = this.track.points[this.track.points.length - 1];
-      if (Math.hypot(this.car.x - lastPt.x, this.car.y - lastPt.y) < 120) {
-        this.goalRace();
+      if (this.gameMode === 'TOUGE') {
+        const lastPt = this.track.points[this.track.points.length - 1];
+        if (Math.hypot(this.car.x - lastPt.x, this.car.y - lastPt.y) < 120) {
+          this.goalRace();
+        }
       }
     }
 
@@ -1321,23 +1486,26 @@ class TougeGame {
     const cy = this.height / 2;
     ctx.translate(cx - this.camera.x, cy - this.camera.y);
 
-    // 1. 地面
-    ctx.fillStyle = '#1c2820';
-    ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
+    if (this.gameMode === 'TOUGE') {
+      // 峠コース描画
+      ctx.fillStyle = '#1c2820';
+      ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
+      this.renderTrack(ctx);
+    } else {
+      // 広場テストモード描画
+      this.renderSkidpad(ctx);
+    }
 
-    // 2. コース道路
-    this.renderTrack(ctx);
-
-    // 3. タイヤ痕＆粒子
+    // タイヤ痕＆粒子
     this.particles.draw(ctx);
 
-    // 4. 指でなぞり中のライン描画
+    // なぞり中のライン描画
     this.renderDrawingLine(ctx);
 
-    // 5. 走行中のドリフトガイドライン
+    // ドリフト走行中の残りガイドライン
     this.renderActiveDriftPath(ctx);
 
-    // 6. タップ波紋
+    // タップ波紋
     if (this.tapIndicator) {
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.tapIndicator.alpha);
@@ -1349,16 +1517,96 @@ class TougeGame {
       ctx.restore();
     }
 
-    // 7. 車両
+    // 車両
     this.renderCar(ctx);
 
-    // 8. 木々
-    this.renderTrees(ctx);
+    if (this.gameMode === 'TOUGE') {
+      this.renderTrees(ctx);
+    }
 
     ctx.restore();
 
-    // 9. ミニマップ
+    // ミニマップ
     this.renderMinimap();
+  }
+
+  // 広場テストエリアの描画
+  renderSkidpad(ctx) {
+    const pad = this.skidpad;
+
+    // 広大なアスファルト広場
+    ctx.fillStyle = '#222824';
+    ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
+
+    // 広場アスファルト円
+    ctx.fillStyle = '#2c3530';
+    ctx.beginPath();
+    ctx.arc(0, 0, pad.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // グリッド目地（速度感・移動感がわかりやすい格子線）
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 2;
+    const gridSize = 160;
+    const startX = Math.floor((this.camera.x - this.width) / gridSize) * gridSize;
+    const endX = this.camera.x + this.width;
+    const startY = Math.floor((this.camera.y - this.height) / gridSize) * gridSize;
+    const endY = this.camera.y + this.height;
+
+    ctx.beginPath();
+    for (let x = startX; x <= endX; x += gridSize) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
+    for (let y = startY; y <= endY; y += gridSize) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
+    ctx.stroke();
+
+    // 定常円旋回用の同心円マーカー
+    ctx.strokeStyle = 'rgba(255, 235, 59, 0.2)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([15, 15]);
+    [100, 220, 360].forEach(r => {
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+
+    // 外周フェンス
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#e2ebe4';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(0, 0, pad.radius - 30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // カラーコーン（パイロン）
+    for (let i = 0; i < pad.cones.length; i++) {
+      const c = pad.cones[i];
+      if (Math.abs(c.x - this.camera.x) > this.width || Math.abs(c.y - this.camera.y) > this.height) continue;
+
+      ctx.save();
+      // 影
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(c.x + 2, c.y + 2, 6, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // コーン本体
+      ctx.fillStyle = c.color;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   renderDrawingLine(ctx) {
@@ -1534,35 +1782,55 @@ class TougeGame {
     const mCtx = this.minimapCtx;
     mCtx.clearRect(0, 0, 76, 76);
 
-    const minX = 100, maxX = 2400;
-    const minY = 200, maxY = 5200;
-    const scaleX = 62 / (maxX - minX);
-    const scaleY = 62 / (maxY - minY);
+    if (this.gameMode === 'TOUGE') {
+      const minX = 100, maxX = 2400;
+      const minY = 200, maxY = 5200;
+      const scaleX = 62 / (maxX - minX);
+      const scaleY = 62 / (maxY - minY);
 
-    mCtx.save();
-    mCtx.translate(7, 7);
+      mCtx.save();
+      mCtx.translate(7, 7);
 
-    mCtx.strokeStyle = '#506c58';
-    mCtx.lineWidth = 3.5;
-    mCtx.lineCap = 'round';
-    mCtx.beginPath();
-    const pts = this.track.points;
-    for (let i = 0; i < pts.length; i += 4) {
-      const mx = (pts[i].x - minX) * scaleX;
-      const my = (pts[i].y - minY) * scaleY;
-      if (i === 0) mCtx.moveTo(mx, my);
-      else mCtx.lineTo(mx, my);
+      mCtx.strokeStyle = '#506c58';
+      mCtx.lineWidth = 3.5;
+      mCtx.lineCap = 'round';
+      mCtx.beginPath();
+      const pts = this.track.points;
+      for (let i = 0; i < pts.length; i += 4) {
+        const mx = (pts[i].x - minX) * scaleX;
+        const my = (pts[i].y - minY) * scaleY;
+        if (i === 0) mCtx.moveTo(mx, my);
+        else mCtx.lineTo(mx, my);
+      }
+      mCtx.stroke();
+
+      const carMx = (this.car.x - minX) * scaleX;
+      const carMy = (this.car.y - minY) * scaleY;
+      mCtx.fillStyle = '#ff1744';
+      mCtx.beginPath();
+      mCtx.arc(carMx, carMy, 3, 0, Math.PI * 2);
+      mCtx.fill();
+
+      mCtx.restore();
+    } else {
+      // 広場モードのミニマップ
+      mCtx.save();
+      mCtx.translate(38, 38);
+      mCtx.strokeStyle = '#4a6e55';
+      mCtx.lineWidth = 2;
+      mCtx.beginPath();
+      mCtx.arc(0, 0, 30, 0, Math.PI * 2);
+      mCtx.stroke();
+
+      const scale = 30 / this.skidpad.radius;
+      const carMx = this.car.x * scale;
+      const carMy = this.car.y * scale;
+      mCtx.fillStyle = '#ff1744';
+      mCtx.beginPath();
+      mCtx.arc(carMx, carMy, 3, 0, Math.PI * 2);
+      mCtx.fill();
+      mCtx.restore();
     }
-    mCtx.stroke();
-
-    const carMx = (this.car.x - minX) * scaleX;
-    const carMy = (this.car.y - minY) * scaleY;
-    mCtx.fillStyle = '#ff1744';
-    mCtx.beginPath();
-    mCtx.arc(carMx, carMy, 3, 0, Math.PI * 2);
-    mCtx.fill();
-
-    mCtx.restore();
   }
 }
 
