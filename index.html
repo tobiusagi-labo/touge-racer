@@ -447,19 +447,26 @@
     }
 
     /* ==========================================================================
-       Tune Panel (?tune=1)
+       Tune Panel (?tune=1, プレイ画面のみ表示)
        ========================================================================== */
+    body.tune-active .hud {
+      padding-bottom: 165px;
+    }
+    body.tune-active.tune-minimized .hud {
+      padding-bottom: 50px;
+    }
+
     #tune-panel {
       display: none;
       position: absolute;
       bottom: 0;
       left: 0;
       width: 100%;
-      background: rgba(12, 18, 14, 0.94);
+      background: rgba(12, 18, 14, 0.95);
       border-top: 2px solid #00e676;
       border-radius: 16px 16px 0 0;
       padding: 10px 14px;
-      z-index: 120;
+      z-index: 100;
       color: #e2ede5;
       font-size: 11px;
       box-shadow: 0 -8px 24px rgba(0,0,0,0.6);
@@ -470,9 +477,12 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-weight: bold;
       color: #00e676;
+    }
+    .tune-body {
+      display: block;
     }
     .tune-row {
       display: flex;
@@ -640,33 +650,38 @@
       </div>
     </div>
 
-    <!-- Tune Panel (?tune=1 のみ表示) -->
+    <!-- Tune Panel (?tune=1 のみ、プレイ画面で表示) -->
     <div id="tune-panel">
       <div class="tune-header">
         <span>🔧 表示調整モード (?tune=1)</span>
-        <button id="tuneToggleCamBtn" type="button" class="tune-btn-sm">🎥 カメラ: 自動追従</button>
+        <div style="display: flex; gap: 6px;">
+          <button id="tuneToggleCamBtn" type="button" class="tune-btn-sm">🎥 カメラ: 追従中</button>
+          <button id="tuneFoldBtn" type="button" class="tune-btn-sm" style="min-width: 55px;">▼ 最小化</button>
+        </div>
       </div>
-      <div class="tune-row">
-        <label>コーススケール</label>
-        <input type="range" id="tuneCourseScale" min="0.5" max="2.0" step="0.05" value="1.0">
-        <span class="tune-val" id="tuneCourseScaleVal">1.00</span>
-      </div>
-      <div class="tune-row">
-        <label>車のサイズ</label>
-        <input type="range" id="tuneCarSize" min="0.5" max="2.0" step="0.05" value="1.0">
-        <span class="tune-val" id="tuneCarSizeVal">1.00</span>
-      </div>
-      <div class="tune-row">
-        <label>視点の距離 (ズーム)</label>
-        <input type="range" id="tuneCamDist" min="0.5" max="2.0" step="0.05" value="1.0">
-        <span class="tune-val" id="tuneCamDistVal">1.00</span>
-      </div>
-      <div class="tune-actions">
-        <button id="tuneCopyBtn" type="button" class="tune-btn">📋 値をコピー (JSON)</button>
-        <button id="tuneResetBtn" type="button" class="tune-btn-sub">🔄 リセット</button>
-      </div>
-      <div id="tuneFallbackBox" style="display: none;">
-        <input type="text" id="tuneFallbackText" readonly>
+      <div id="tuneBody" class="tune-body">
+        <div class="tune-row">
+          <label>コーススケール</label>
+          <input type="range" id="tuneCourseScale" min="0.5" max="2.0" step="0.05" value="1.0">
+          <span class="tune-val" id="tuneCourseScaleVal">1.00</span>
+        </div>
+        <div class="tune-row">
+          <label>車のサイズ</label>
+          <input type="range" id="tuneCarSize" min="0.5" max="2.0" step="0.05" value="1.0">
+          <span class="tune-val" id="tuneCarSizeVal">1.00</span>
+        </div>
+        <div class="tune-row">
+          <label>視点の距離 (ズーム)</label>
+          <input type="range" id="tuneCameraDist" min="0.5" max="2.0" step="0.05" value="1.0">
+          <span class="tune-val" id="tuneCameraDistVal">1.00</span>
+        </div>
+        <div class="tune-actions">
+          <button id="tuneCopyBtn" type="button" class="tune-btn">📋 値をコピー (JSON)</button>
+          <button id="tuneResetBtn" type="button" class="tune-btn-sub">🔄 リセット</button>
+        </div>
+        <div id="tuneFallbackBox" style="display: none;">
+          <input type="text" id="tuneFallbackText" readonly>
+        </div>
       </div>
     </div>
   </div>
@@ -1630,11 +1645,10 @@ class TougeGame {
     this.maxComboAchieved = 0;
     this.lastFrameTime = performance.now();
 
+    this.initEvents();
     if (this.isTuneMode) {
       this.initTunePanel();
     }
-
-    this.initEvents();
     this.resize();
     this.drawTitleHero();
 
@@ -1644,7 +1658,9 @@ class TougeGame {
   initTunePanel() {
     const tunePanel = document.getElementById('tune-panel');
     if (!tunePanel) return;
-    tunePanel.style.display = 'block';
+
+    // パネルはタイトル画面では非表示にし、プレイ中のみ表示する
+    tunePanel.style.display = 'none';
 
     // パネルの操作はゲームの操作（車の操舵など）と競合しないようイベント伝播を停止
     const stopEvts = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'pointerdown'];
@@ -1655,95 +1671,124 @@ class TougeGame {
     });
 
     const sCourse = document.getElementById('tuneCourseScale');
-    const vCourse = document.getElementById('valCourseScale');
+    const vCourse = document.getElementById('tuneCourseScaleVal');
     const sCar = document.getElementById('tuneCarSize');
-    const vCar = document.getElementById('valCarSize');
+    const vCar = document.getElementById('tuneCarSizeVal');
     const sCam = document.getElementById('tuneCameraDist');
-    const vCam = document.getElementById('valCameraDist');
-    const btnCopy = document.getElementById('btnCopyTune');
-    const btnReset = document.getElementById('btnResetTune');
-    const btnCamMode = document.getElementById('btnToggleCamMode');
+    const vCam = document.getElementById('tuneCameraDistVal');
+    const btnCopy = document.getElementById('tuneCopyBtn');
+    const btnReset = document.getElementById('tuneResetBtn');
+    const btnCamMode = document.getElementById('tuneToggleCamBtn');
+    const btnFold = document.getElementById('tuneFoldBtn');
+    const tuneBody = document.getElementById('tuneBody');
     const fallbackBox = document.getElementById('tuneFallbackBox');
     const fallbackText = document.getElementById('tuneFallbackText');
 
-    sCourse.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      this.tuneConfig.COURSE_SCALE = val;
-      vCourse.textContent = val.toFixed(2);
-      this.track.generate(val);
-      if (this.gameMode === 'TOUGE' && this.appState === 'PLAYING') {
-        this.car.currentSegIndex = 0;
-      }
-    });
+    if (btnFold && tuneBody) {
+      let isFolded = false;
+      btnFold.addEventListener('click', () => {
+        isFolded = !isFolded;
+        tuneBody.style.display = isFolded ? 'none' : 'block';
+        btnFold.textContent = isFolded ? '▲ 展開' : '▼ 最小化';
+        document.body.classList.toggle('tune-minimized', isFolded);
+      });
+    }
 
-    sCar.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      this.tuneConfig.CAR_SIZE = val;
-      vCar.textContent = val.toFixed(2);
-      this.car.updateSize(val);
-    });
+    if (sCourse) {
+      sCourse.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        this.tuneConfig.COURSE_SCALE = val;
+        if (vCourse) vCourse.textContent = val.toFixed(2);
+        this.track.generate(val);
+        if (this.gameMode === 'TOUGE' && this.appState === 'PLAYING') {
+          this.car.currentSegIndex = 0;
+        }
+      });
+    }
 
-    sCam.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      this.tuneConfig.CAMERA_DISTANCE = val;
-      vCam.textContent = val.toFixed(2);
-    });
+    if (sCar) {
+      sCar.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        this.tuneConfig.CAR_SIZE = val;
+        if (vCar) vCar.textContent = val.toFixed(2);
+        this.car.updateSize(val);
+      });
+    }
 
-    btnCopy.addEventListener('click', () => {
-      const exportData = {
-        COURSE_SCALE: parseFloat(this.tuneConfig.COURSE_SCALE.toFixed(2)),
-        CAR_SIZE: parseFloat(this.tuneConfig.CAR_SIZE.toFixed(2)),
-        CAMERA_DISTANCE: parseFloat(this.tuneConfig.CAMERA_DISTANCE.toFixed(2))
-      };
-      const jsonStr = JSON.stringify(exportData, null, 2);
+    if (sCam) {
+      sCam.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        this.tuneConfig.CAMERA_DISTANCE = val;
+        if (vCam) vCam.textContent = val.toFixed(2);
+      });
+    }
 
-      const showFallback = () => {
-        fallbackBox.style.display = 'block';
-        fallbackText.value = jsonStr;
-        fallbackText.focus();
-        fallbackText.select();
-      };
+    if (btnCopy) {
+      btnCopy.addEventListener('click', () => {
+        const exportData = {
+          COURSE_SCALE: parseFloat(this.tuneConfig.COURSE_SCALE.toFixed(2)),
+          CAR_SIZE: parseFloat(this.tuneConfig.CAR_SIZE.toFixed(2)),
+          CAMERA_DISTANCE: parseFloat(this.tuneConfig.CAMERA_DISTANCE.toFixed(2))
+        };
+        const jsonStr = JSON.stringify(exportData, null, 2);
 
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(jsonStr).then(() => {
-          const orig = btnCopy.textContent;
-          btnCopy.textContent = '✅ コピー完了!';
-          setTimeout(() => { btnCopy.textContent = orig; }, 1500);
-        }).catch(err => {
-          console.warn('Clipboard write failed, showing fallback textarea:', err);
+        const showFallback = () => {
+          if (fallbackBox && fallbackText) {
+            fallbackBox.style.display = 'block';
+            fallbackText.value = jsonStr;
+            fallbackText.focus();
+            fallbackText.select();
+          }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(jsonStr).then(() => {
+            const orig = btnCopy.textContent;
+            btnCopy.textContent = '✅ コピー完了!';
+            setTimeout(() => { btnCopy.textContent = orig; }, 1500);
+          }).catch(err => {
+            console.warn('Clipboard write failed, showing fallback textarea:', err);
+            showFallback();
+          });
+        } else {
           showFallback();
-        });
-      } else {
-        showFallback();
-      }
-    });
+        }
+      });
+    }
 
-    btnReset.addEventListener('click', () => {
-      this.tuneConfig.COURSE_SCALE = 1.0;
-      this.tuneConfig.CAR_SIZE = 1.0;
-      this.tuneConfig.CAMERA_DISTANCE = 1.0;
+    if (btnReset) {
+      btnReset.addEventListener('click', () => {
+        this.tuneConfig.COURSE_SCALE = 1.0;
+        this.tuneConfig.CAR_SIZE = 1.0;
+        this.tuneConfig.CAMERA_DISTANCE = 1.0;
 
-      sCourse.value = 1.0;
-      vCourse.textContent = '1.00';
-      this.track.generate(1.0);
+        if (sCourse) sCourse.value = 1.0;
+        if (vCourse) vCourse.textContent = '1.00';
+        this.track.generate(1.0);
 
-      sCar.value = 1.0;
-      vCar.textContent = '1.00';
-      this.car.updateSize(1.0);
+        if (sCar) sCar.value = 1.0;
+        if (vCar) vCar.textContent = '1.00';
+        this.car.updateSize(1.0);
 
-      sCam.value = 1.0;
-      vCam.textContent = '1.00';
+        if (sCam) sCam.value = 1.0;
+        if (vCam) vCam.textContent = '1.00';
 
-      this.cameraFreeMode = false;
-      btnCamMode.textContent = 'カメラ: 追従中';
-      fallbackBox.style.display = 'none';
-    });
+        this.cameraFreeMode = false;
+        if (btnCamMode) {
+          btnCamMode.textContent = '🎥 カメラ: 追従中';
+          btnCamMode.style.color = '#8be0a5';
+        }
+        if (fallbackBox) fallbackBox.style.display = 'none';
+      });
+    }
 
-    btnCamMode.addEventListener('click', () => {
-      this.cameraFreeMode = !this.cameraFreeMode;
-      btnCamMode.textContent = this.cameraFreeMode ? 'カメラ: フリー' : 'カメラ: 追従中';
-      btnCamMode.style.color = this.cameraFreeMode ? '#ffeb3b' : '#8be0a5';
-    });
+    if (btnCamMode) {
+      btnCamMode.addEventListener('click', () => {
+        this.cameraFreeMode = !this.cameraFreeMode;
+        btnCamMode.textContent = this.cameraFreeMode ? '🎥 カメラ: フリー' : '🎥 カメラ: 追従中';
+        btnCamMode.style.color = this.cameraFreeMode ? '#ffeb3b' : '#8be0a5';
+      });
+    }
   }
 
   initEvents() {
@@ -1764,6 +1809,11 @@ class TougeGame {
         this.appState = 'PLAYING';
         this.titleScreen.style.display = 'none';
         this.gameHud.style.display = 'flex';
+        if (this.isTuneMode) {
+          const tunePanel = document.getElementById('tune-panel');
+          if (tunePanel) tunePanel.style.display = 'block';
+          document.body.classList.add('tune-active');
+        }
         this.startRace();
       });
     });
@@ -1775,6 +1825,9 @@ class TougeGame {
         this.car.endDrift();
         this.gameModal.style.display = 'none';
         this.gameHud.style.display = 'none';
+        const tunePanel = document.getElementById('tune-panel');
+        if (tunePanel) tunePanel.style.display = 'none';
+        document.body.classList.remove('tune-active');
         this.titleScreen.style.display = 'flex';
         this.drawTitleHero();
       });
@@ -1815,9 +1868,9 @@ class TougeGame {
           this.panStartPos = { x: clientX, y: clientY };
           this.panCamStart = { x: this.camera.x, y: this.camera.y };
           this.cameraFreeMode = true;
-          const btnCamMode = document.getElementById('btnToggleCamMode');
+          const btnCamMode = document.getElementById('tuneToggleCamBtn');
           if (btnCamMode) {
-            btnCamMode.textContent = 'カメラ: フリー';
+            btnCamMode.textContent = '🎥 カメラ: フリー';
             btnCamMode.style.color = '#ffeb3b';
           }
           return;
