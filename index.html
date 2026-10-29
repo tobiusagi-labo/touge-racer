@@ -619,7 +619,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 1.1.0</div>
+        <div class="title-version">ver 1.2.0</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">GRAB & DASH</div>
       </div>
@@ -793,8 +793,13 @@ const PHYSICS_CONFIG = {
   LATERAL_GRIP: 0.85,               // 横方向グリップ減衰係数
   ALIGN_TO_VELOCITY_RATE: 0.12,     // 進行方向へのセルフアライニング率
 
-  // 6. 壁衝突パラメータ
-  WALL_DECEL_RATE: 0.30,            // 壁接触開始時の壁沿い速度減衰率（30%減速）
+  // 6. 壁衝突・剛体物理パラメータ (接触点インパルス法)
+  WALL_RESTITUTION: 0.05,           // 壁との反発係数 (0.05程度)
+  WALL_FRICTION: 0.10,              // 壁沿いの摩擦係数 (0.10程度)
+  HEADON_TORQUE_YAW: 0.5,           // 正対衝突時の微小角速度 (0.5rad/s)
+  MAX_YAW_RATE: 6.0,                // 角速度上限 (6.0rad/s)
+  COLLISION_YAW_DAMPING: 0.30,      // 衝突中の角速度減衰 (毎秒30%程度)
+  DASH_STUCK_TIMEOUT: 0.5,          // 壁スタック時のダッシュ目標破棄時間 (0.5秒)
 
   // 7. 視点ドラッグ定数
   ROTATE_DRAG_THRESHOLD_PX: 10,     // 視点回転を開始する最小ドラッグ移動量 (10px)
@@ -1069,53 +1074,128 @@ class SkidpadArea {
     }
   }
 
-  checkCollision(car, particles) {
-    const dist = Math.hypot(car.x, car.y);
-    const safeLimit = this.radius - (car.length ? car.length / 2 : 40);
-    if (dist > safeLimit) {
-      const ang = Math.atan2(car.y, car.x);
-      // 1. 壁にめり込んだら位置を壁の法線方向へ押し戻す
-      car.x = Math.cos(ang) * safeLimit;
-      car.y = Math.sin(ang) * safeLimit;
+  checkCollision(car, particles, safeDt = 1/60) {
+    const halfRoad = this.radius - 30;
+    const carRadius = Math.hypot(car.length / 2, car.width / 2);
+    const safeMargin = carRadius * 0.02; // 安全距離 (車の半径の2%)
+    const limitDist = halfRoad - safeMargin;
 
-      // コース内向き法線 (nx_in, ny_in)
-      const nx_in = -Math.cos(ang);
-      const ny_in = -Math.sin(ang);
+    // 車体4隅の接触点
+    const contacts = car.getContactPoints();
+    let maxPenetration = 0;
+    let avgNormalX = 0;
+    let avgNormalY = 0;
+    let contactCount = 0;
+    let firstContactPoint = null;
+    const collidingPoints = [];
 
-      // 速度と法線の内積 (vn < 0 のとき壁へ向かっている)
-      const vn = car.vx * nx_in + car.vy * ny_in;
-      let tangentX = car.vx;
-      let tangentY = car.vy;
-      if (vn < 0) {
-        // 壁へ向かう成分を取り除き、壁に沿う成分を残す
-        tangentX = car.vx - vn * nx_in;
-        tangentY = car.vy - vn * ny_in;
+    for (let i = 0; i < contacts.length; i++) {
+      const pt = contacts[i];
+      const d = Math.hypot(pt.x, pt.y) || 0.001;
+      if (d > limitDist) {
+        const pen = d - limitDist;
+        // 壁からコース中心に向かう単位法線ベクトル
+        const nx = -pt.x / d;
+        const ny = -pt.y / d;
+
+        collidingPoints.push({ pt, pen, nx, ny });
+        if (pen > maxPenetration) {
+          maxPenetration = pen;
+          firstContactPoint = pt;
+        }
+        avgNormalX += nx;
+        avgNormalY += ny;
+        contactCount++;
       }
+    }
 
-      // 同じ接触で毎フレーム減速されないよう、接触開始時のみ減速
+    if (contactCount > 0) {
+      const normLen = Math.hypot(avgNormalX, avgNormalY) || 1;
+      const nx = avgNormalX / normLen;
+      const ny = avgNormalY / normLen;
+      car.wallNormal = { x: nx, y: ny };
+
+      // 1. 位置を壁の法線方向へ押し戻し (安全距離: 車半径の2%)
+      car.x += nx * (maxPenetration + safeMargin);
+      car.y += ny * (maxPenetration + safeMargin);
+
+      // 2. 接触開始時のみ: スパーク生成 ＆ ダッシュ段階を1つ下げる
       if (!car.isWallContacting) {
-        particles.addSparks(car.x, car.y, nx_in, ny_in);
-        // 壁に沿う成分を30%だけ減速
-        tangentX *= (1.0 - PHYSICS_CONFIG.WALL_DECEL_RATE);
-        tangentY *= (1.0 - PHYSICS_CONFIG.WALL_DECEL_RATE);
-
-        // ダッシュの段階だけを1つ下げる (目標と推力は維持)
+        if (firstContactPoint) particles.addSparks(firstContactPoint.x, firstContactPoint.y, nx, ny);
         if (car.boostLevel > 1) {
           car.boostLevel--;
           car.noCrashDistance = PHYSICS_CONFIG.BOOST_STAGE_DISTANCES[car.boostLevel - 1];
         } else {
           car.noCrashDistance = 0;
         }
-
         car.isWallContacting = true;
       }
 
-      // 反発なしで壁沿いに滑る
-      car.vx = tangentX;
-      car.vy = tangentY;
+      // 3. 正対衝突時の微小回転トルク (進行方向と法線のなす角が5度以内のとき)
+      const cosH = Math.cos(car.heading);
+      const sinH = Math.sin(car.heading);
+      const headOnDot = -(cosH * nx + sinH * ny);
+      if (headOnDot > 0.996) {
+        let sign = 0;
+        if (firstContactPoint && Math.abs(firstContactPoint.latOffset) > 0.1) {
+          sign = firstContactPoint.latOffset > 0 ? 1 : -1;
+        } else {
+          sign = Math.random() < 0.5 ? 1 : -1;
+        }
+        car.yawRate += sign * PHYSICS_CONFIG.HEADON_TORQUE_YAW;
+      }
+
+      // 4. 各接触点でのインパルス応答 (法線インパルス & 摩擦インパルス)
+      // 速度・角速度の単位系 (px/s, rad/s) に統一して物理インパルスを計算
+      const m = car.mass || 1.0;
+      const I = car.inertia;
+      const e = PHYSICS_CONFIG.WALL_RESTITUTION; // 0.05
+      const mu = PHYSICS_CONFIG.WALL_FRICTION;   // 0.10
+      const invDt = safeDt > 0.0001 ? (1.0 / safeDt) : 60.0;
+
+      const vxSec = car.vx * invDt;
+      const vySec = car.vy * invDt;
+
+      for (let i = 0; i < collidingPoints.length; i++) {
+        const col = collidingPoints[i];
+        const pt = col.pt;
+        const cnx = col.nx;
+        const cny = col.ny;
+        const ctx = -cny;
+        const cty = cnx;
+
+        // 接触点相対速度: v_contact = v + ω × r (px/s)
+        const vcx = vxSec - car.yawRate * pt.ry;
+        const vcy = vySec + car.yawRate * pt.rx;
+        const vn = vcx * cnx + vcy * cny;
+
+        if (vn < 0) {
+          const rCrossN = pt.rx * cny - pt.ry * cnx;
+          const Kn = (1 / m) + (rCrossN * rCrossN) / I;
+          const jn = -(1 + e) * vn / Kn;
+
+          const vt = vcx * ctx + vcy * cty;
+          const rCrossT = pt.rx * cty - pt.ry * ctx;
+          const Kt = (1 / m) + (rCrossT * rCrossT) / I;
+          let jt = -vt / Kt;
+          const maxJt = mu * jn;
+          jt = Math.max(-maxJt, Math.min(maxJt, jt));
+
+          car.vx += ((jn * cnx + jt * ctx) / m) * safeDt;
+          car.vy += ((jn * cny + jt * cty) / m) * safeDt;
+          car.yawRate += (rCrossN * jn + rCrossT * jt) / I;
+        }
+      }
+
+      // 5. 衝突中の角速度減衰 (毎秒30%程度)
+      const damp = Math.max(0, 1.0 - PHYSICS_CONFIG.COLLISION_YAW_DAMPING * safeDt);
+      car.yawRate *= damp;
+      car.yawRate = Math.max(-PHYSICS_CONFIG.MAX_YAW_RATE, Math.min(PHYSICS_CONFIG.MAX_YAW_RATE, car.yawRate));
+
       car.speed = Math.hypot(car.vx, car.vy);
     } else {
       car.isWallContacting = false;
+      car.wallNormal = null;
     }
   }
 }
@@ -1172,7 +1252,11 @@ class Car {
     this.noCrashDistance = 0;
     this.boostLevel = 1;
     this.isWallContacting = false; // 壁接触状態フラグ
-    this.yawRate = 0;             // 車体角速度 (リア振り回し用)
+    this.wallNormal = null;        // 壁の内向き法線ベクトル
+    this.yawRate = 0;             // 車体角速度 (剛体回転用)
+    this.mass = 1.0;              // 車両質量
+    this.dashStuckTimer = 0;      // 壁スタック検知タイマー
+    this.lastMinDashDist = Infinity;
 
     this.lastSafe = {
       x: this.x,
@@ -1186,12 +1270,56 @@ class Car {
   get angle() { return this.heading; }
   set angle(v) { this.heading = v; }
 
+  // 慣性モーメント (重心まわり、平行軸の定理)
+  get inertia() {
+    const m = this.mass || 1.0;
+    const geomI = (1 / 12) * m * (this.length * this.length + this.width * this.width);
+    const cgOffset = this.length * PHYSICS_CONFIG.CG_REAR_OFFSET_RATIO;
+    return geomI + m * cgOffset * cgOffset;
+  }
+
+  // 車体4隅の接触点 (重心からの腕のベクトル r を含む)
+  getContactPoints() {
+    const halfL = this.length / 2;
+    const halfW = this.width / 2;
+    const cos = Math.cos(this.heading);
+    const sin = Math.sin(this.heading);
+    const uX = cos;
+    const uY = sin;
+    const nX = -sin;
+    const nY = cos;
+
+    // 重心位置 (幾何中心から車長の30%リア寄り)
+    const cgOffset = this.length * PHYSICS_CONFIG.CG_REAR_OFFSET_RATIO;
+    const cgX = this.x - uX * cgOffset;
+    const cgY = this.y - uY * cgOffset;
+
+    // 車体の4隅頂点 (FL, FR, RL, RR)
+    const corners = [
+      { name: 'FL', x: this.x + uX * halfL - nX * halfW, y: this.y + uY * halfL - nY * halfW, latOffset: -halfW },
+      { name: 'FR', x: this.x + uX * halfL + nX * halfW, y: this.y + uY * halfL + nY * halfW, latOffset: halfW },
+      { name: 'RL', x: this.x - uX * halfL - nX * halfW, y: this.y - uY * halfL - nY * halfW, latOffset: -halfW },
+      { name: 'RR', x: this.x - uX * halfL + nX * halfW, y: this.y - uY * halfL + nY * halfW, latOffset: halfW }
+    ];
+
+    return corners.map(pt => ({
+      name: pt.name,
+      x: pt.x,
+      y: pt.y,
+      latOffset: pt.latOffset,
+      rx: pt.x - cgX,
+      ry: pt.y - cgY
+    }));
+  }
+
   // ② 直線ダッシュ目標を設定（pointerdown瞬間に1回）
   setDashTarget(targetX, targetY) {
     if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
     this.targetPos = { x: targetX, y: targetY };
     this.isAccelerating = true;
     this.dashTimer = 0;
+    this.dashStuckTimer = 0;
+    this.lastMinDashDist = Infinity;
     this.isGrabbed = false;
   }
 
@@ -1199,6 +1327,8 @@ class Car {
     this.targetPos = null;
     this.isAccelerating = false;
     this.dashTimer = 0;
+    this.dashStuckTimer = 0;
+    this.lastMinDashDist = Infinity;
   }
 
   update(dt, gameMode, track, skidpad, particles, grabTargetSmooth) {
@@ -1329,48 +1459,82 @@ class Car {
         const dy = this.targetPos.y - this.y;
         const dist = Math.hypot(dx, dy);
 
+        // スタック検知: 目標までの距離が減らない（前進できない・壁に引っかかっている）状態が0.5秒続いたらダッシュ目標破棄
+        const progress = this.lastMinDashDist - dist;
+        if (progress > 0.8) {
+          this.lastMinDashDist = dist;
+          this.dashStuckTimer = 0;
+        } else {
+          this.dashStuckTimer += safeDt;
+          if (this.dashStuckTimer >= PHYSICS_CONFIG.DASH_STUCK_TIMEOUT) {
+            this.stopDash();
+          }
+        }
+
         const headX = Math.cos(this.heading);
         const headY = Math.sin(this.heading);
         const forwardDot = dx * headX + dy * headY;
 
         const arrivalDist = this.length * PHYSICS_CONFIG.ARRIVAL_DIST_RATIO;
-        // 目標到達、通過、または制限時間超過で推力終了（慣性だけで進む）
-        if (dist < arrivalDist || forwardDot < -4 || this.dashTimer >= PHYSICS_CONFIG.DASH_MAX_DURATION) {
-          this.stopDash();
-        } else {
-          // 車体を目標方位へ旋回
-          const targetHeading = Math.atan2(dy, dx);
-          const diff = normalizeAngle(targetHeading - this.heading);
-          const frameTurnSpeed = PHYSICS_CONFIG.TURN_SPEED * (safeDt / (1/60));
-          this.heading = normalizeAngle(this.heading + Math.sign(diff) * Math.min(Math.abs(diff), frameTurnSpeed));
-
-          // 目標までの距離が、現在の速度から止まるのに必要な距離(速度²÷(2×減速度))より短くなったら減速を始める
-          const decelRate = PHYSICS_CONFIG.DASH_DECEL_RATE;
-          const stopDist = (this.speed * this.speed) / (2 * Math.max(0.01, decelRate));
-
-          if (dist < stopDist) {
-            // 減速フェーズ: 必要な減速度で減速
-            const decelStep = decelRate * (safeDt / (1/60));
-            const newSpeed = Math.max(0, this.speed - decelStep);
-            if (this.speed > 0.0001) {
-              const s = newSpeed / this.speed;
-              this.vx *= s;
-              this.vy *= s;
-              this.speed = newSpeed;
-            }
+        if (this.targetPos) {
+          // 目標到達、通過、または制限時間超過で推力終了（慣性だけで進む）
+          if (dist < arrivalDist || forwardDot < -4 || this.dashTimer >= PHYSICS_CONFIG.DASH_MAX_DURATION) {
+            this.stopDash();
           } else {
-            // 加速フェーズ: 直線ダッシュ推力をかける（最高速未満のとき）
-            if (this.speed < maxAllowedSpeed * 0.98) {
-              const accelPower = this.length * (PHYSICS_CONFIG.DASH_ACCEL_POWER_RATIO / 60) * (safeDt / (1/60));
-              this.vx += Math.cos(this.heading) * accelPower;
-              this.vy += Math.sin(this.heading) * accelPower;
+            // 壁接触中でなければ車体を目標方位へ旋回（接触中は剛体トルクによる回頭を優先）
+            if (!this.isWallContacting) {
+              const targetHeading = Math.atan2(dy, dx);
+              const diff = normalizeAngle(targetHeading - this.heading);
+              const frameTurnSpeed = PHYSICS_CONFIG.TURN_SPEED * (safeDt / (1/60));
+              this.heading = normalizeAngle(this.heading + Math.sign(diff) * Math.min(Math.abs(diff), frameTurnSpeed));
+            }
+
+            // 目標までの距離が、現在の速度から止まるのに必要な距離(速度²÷(2×減速度))より短くなったら減速を始める
+            const decelRate = PHYSICS_CONFIG.DASH_DECEL_RATE;
+            const stopDist = (this.speed * this.speed) / (2 * Math.max(0.01, decelRate));
+
+            if (dist < stopDist) {
+              // 減速フェーズ: 必要な減速度で減速
+              const decelStep = decelRate * (safeDt / (1/60));
+              const newSpeed = Math.max(0, this.speed - decelStep);
+              if (this.speed > 0.0001) {
+                const s = newSpeed / this.speed;
+                this.vx *= s;
+                this.vy *= s;
+                this.speed = newSpeed;
+              }
+            } else {
+              // 加速フェーズ: 直線ダッシュ推力をかける（最高速未満のとき）
+              if (this.speed < maxAllowedSpeed * 0.98) {
+                const accelPower = this.length * (PHYSICS_CONFIG.DASH_ACCEL_POWER_RATIO / 60) * (safeDt / (1/60));
+                let thrustX = Math.cos(this.heading) * accelPower;
+                let thrustY = Math.sin(this.heading) * accelPower;
+
+                // 推力は、壁へ向かう成分を取り除き、壁に沿う成分だけを残す
+                if (this.isWallContacting && this.wallNormal) {
+                  const thrustDot = thrustX * this.wallNormal.x + thrustY * this.wallNormal.y;
+                  if (thrustDot < 0) {
+                    thrustX -= thrustDot * this.wallNormal.x;
+                    thrustY -= thrustDot * this.wallNormal.y;
+                  }
+                }
+
+                this.vx += thrustX;
+                this.vy += thrustY;
+              }
             }
           }
         }
       }
 
-      // 舵を切っていない間は車体の向きを速度ベクトルの方向へ寄せる
-      if (!this.targetPos && this.speed > 0.5) {
+      // 剛体インパルスによる角速度の反映と自然減衰
+      this.heading = normalizeAngle(this.heading + this.yawRate * safeDt);
+      if (!this.isWallContacting) {
+        this.yawRate *= Math.max(0, 1.0 - 5.0 * safeDt);
+      }
+
+      // 舵を切っておらず角速度も落ち着いている間は車体の向きを速度ベクトルの方向へ寄せる
+      if (!this.targetPos && !this.isWallContacting && this.speed > 0.5 && Math.abs(this.yawRate) < 0.5) {
         const moveAngle = Math.atan2(this.vy, this.vx);
         const alignDiff = normalizeAngle(moveAngle - this.heading);
         this.heading = normalizeAngle(this.heading + alignDiff * (PHYSICS_CONFIG.ALIGN_TO_VELOCITY_RATE * (safeDt / (1/60))));
@@ -1424,19 +1588,20 @@ class Car {
 
     if (this.isGrabbed) {
       if (gameMode === 'TOUGE') {
-        this.checkTougeCollision(track, particles);
+        this.checkTougeCollision(track, particles, safeDt);
       } else {
-        skidpad.checkCollision(this, particles);
+        skidpad.checkCollision(this, particles, safeDt);
       }
     } else {
+      const stepDt = safeDt / steps;
       for (let s = 0; s < steps; s++) {
         this.x += stepDx;
         this.y += stepDy;
 
         if (gameMode === 'TOUGE') {
-          this.checkTougeCollision(track, particles);
+          this.checkTougeCollision(track, particles, stepDt);
         } else {
-          skidpad.checkCollision(this, particles);
+          skidpad.checkCollision(this, particles, stepDt);
         }
       }
     }
@@ -1470,66 +1635,139 @@ class Car {
     }
   }
 
-  checkTougeCollision(track, particles) {
+  checkTougeCollision(track, particles, safeDt = 1/60) {
     if (!track) return;
-    const rel = track.getTrackRelationLocal(this.x, this.y, this.currentSegIndex);
-    if (rel.closestSeg) {
-      if (rel.closestSeg.index >= this.currentSegIndex) {
-        this.currentSegIndex = rel.closestSeg.index;
-      }
+
+    // 車体中心のセグメントインデックスを追従
+    const centerRel = track.getTrackRelationLocal(this.x, this.y, this.currentSegIndex);
+    if (centerRel.closestSeg && centerRel.closestSeg.index >= this.currentSegIndex) {
+      this.currentSegIndex = centerRel.closestSeg.index;
     }
 
     const halfRoad = track.roadWidth / 2;
-    const safeLimit = Math.max(10, halfRoad - (this.width / 2) - 2);
+    const carRadius = Math.hypot(this.length / 2, this.width / 2);
+    const safeMargin = carRadius * 0.02; // 安全距離 (車の半径の2%)
+    const limitDist = halfRoad - safeMargin;
 
-    if (rel.minDist > safeLimit) {
-      const proj = rel.proj;
-      const offX = this.x - proj.x;
-      const offY = this.y - proj.y;
-      const dist = Math.hypot(offX, offY) || 0.001;
+    // 車体4隅の接触点
+    const contacts = this.getContactPoints();
+    let maxPenetration = 0;
+    let avgNormalX = 0;
+    let avgNormalY = 0;
+    let contactCount = 0;
+    let firstContactPoint = null;
+    const collidingPoints = [];
 
-      // 1. 位置を壁の法線方向へ押し戻す (めり込みを残さない)
-      this.x = proj.x + (offX / dist) * safeLimit;
-      this.y = proj.y + (offY / dist) * safeLimit;
+    for (let i = 0; i < contacts.length; i++) {
+      const pt = contacts[i];
+      const rel = track.getTrackRelationLocal(pt.x, pt.y, this.currentSegIndex);
+      if (rel.minDist > limitDist) {
+        const pen = rel.minDist - limitDist;
+        const offX = pt.x - rel.proj.x;
+        const offY = pt.y - rel.proj.y;
+        const dist = Math.hypot(offX, offY) || 0.001;
+        // 壁からコース中心（内向き）に向かう単位法線ベクトル
+        const nx = -offX / dist;
+        const ny = -offY / dist;
 
-      // コース内向き法線 (nx_in, ny_in)
-      const nx_in = -offX / dist;
-      const ny_in = -offY / dist;
-
-      // 速度と法線の内積 (vn < 0 のとき壁へ向かっている)
-      const vn = this.vx * nx_in + this.vy * ny_in;
-      let tangentX = this.vx;
-      let tangentY = this.vy;
-      if (vn < 0) {
-        // 壁へ向かう成分を取り除き、壁に沿う成分を残す
-        tangentX = this.vx - vn * nx_in;
-        tangentY = this.vy - vn * ny_in;
+        collidingPoints.push({ pt, pen, nx, ny });
+        if (pen > maxPenetration) {
+          maxPenetration = pen;
+          firstContactPoint = pt;
+        }
+        avgNormalX += nx;
+        avgNormalY += ny;
+        contactCount++;
       }
+    }
 
-      // 同じ接触で毎フレーム減速されないよう、接触開始時のみ減速
+    if (contactCount > 0) {
+      const normLen = Math.hypot(avgNormalX, avgNormalY) || 1;
+      const nx = avgNormalX / normLen;
+      const ny = avgNormalY / normLen;
+      this.wallNormal = { x: nx, y: ny };
+
+      // 1. 位置を壁の法線方向へ押し戻し (安全距離: 車半径の2%)
+      this.x += nx * (maxPenetration + safeMargin);
+      this.y += ny * (maxPenetration + safeMargin);
+
+      // 2. 接触開始時のみ: スパーク生成 ＆ ダッシュ段階を1つ下げる
       if (!this.isWallContacting) {
-        particles.addSparks(this.x, this.y, nx_in, ny_in);
-        // 壁に沿う成分を30%だけ減速
-        tangentX *= (1.0 - PHYSICS_CONFIG.WALL_DECEL_RATE);
-        tangentY *= (1.0 - PHYSICS_CONFIG.WALL_DECEL_RATE);
-
-        // ダッシュの目標と速度はリセットせず、段階だけを1つ下げる
+        if (firstContactPoint) particles.addSparks(firstContactPoint.x, firstContactPoint.y, nx, ny);
         if (this.boostLevel > 1) {
           this.boostLevel--;
           this.noCrashDistance = PHYSICS_CONFIG.BOOST_STAGE_DISTANCES[this.boostLevel - 1];
         } else {
           this.noCrashDistance = 0;
         }
-
         this.isWallContacting = true;
       }
 
-      // 反発はなしにして、壁沿いに滑るようにする (推力・目標は維持)
-      this.vx = tangentX;
-      this.vy = tangentY;
+      // 3. 正対衝突時の微小回転トルク (進行方向と法線のなす角が5度以内のとき)
+      const cosH = Math.cos(this.heading);
+      const sinH = Math.sin(this.heading);
+      const headOnDot = -(cosH * nx + sinH * ny);
+      if (headOnDot > 0.996) {
+        let sign = 0;
+        if (firstContactPoint && Math.abs(firstContactPoint.latOffset) > 0.1) {
+          sign = firstContactPoint.latOffset > 0 ? 1 : -1;
+        } else {
+          sign = Math.random() < 0.5 ? 1 : -1;
+        }
+        this.yawRate += sign * PHYSICS_CONFIG.HEADON_TORQUE_YAW;
+      }
+
+      // 4. 各接触点でのインパルス応答 (法線インパルス & 摩擦インパルス)
+      // 速度・角速度の単位系 (px/s, rad/s) に統一して物理インパルスを計算
+      const m = this.mass || 1.0;
+      const I = this.inertia;
+      const e = PHYSICS_CONFIG.WALL_RESTITUTION; // 0.05
+      const mu = PHYSICS_CONFIG.WALL_FRICTION;   // 0.10
+      const invDt = safeDt > 0.0001 ? (1.0 / safeDt) : 60.0;
+
+      const vxSec = this.vx * invDt;
+      const vySec = this.vy * invDt;
+
+      for (let i = 0; i < collidingPoints.length; i++) {
+        const col = collidingPoints[i];
+        const pt = col.pt;
+        const cnx = col.nx;
+        const cny = col.ny;
+        const ctx = -cny;
+        const cty = cnx;
+
+        // 接触点相対速度: v_contact = v + ω × r (px/s)
+        const vcx = vxSec - this.yawRate * pt.ry;
+        const vcy = vySec + this.yawRate * pt.rx;
+        const vn = vcx * cnx + vcy * cny;
+
+        if (vn < 0) {
+          const rCrossN = pt.rx * cny - pt.ry * cnx;
+          const Kn = (1 / m) + (rCrossN * rCrossN) / I;
+          const jn = -(1 + e) * vn / Kn;
+
+          const vt = vcx * ctx + vcy * cty;
+          const rCrossT = pt.rx * cty - pt.ry * ctx;
+          const Kt = (1 / m) + (rCrossT * rCrossT) / I;
+          let jt = -vt / Kt;
+          const maxJt = mu * jn;
+          jt = Math.max(-maxJt, Math.min(maxJt, jt));
+
+          this.vx += ((jn * cnx + jt * ctx) / m) * safeDt;
+          this.vy += ((jn * cny + jt * cty) / m) * safeDt;
+          this.yawRate += (rCrossN * jn + rCrossT * jt) / I;
+        }
+      }
+
+      // 5. 衝突中の角速度減衰 (毎秒30%程度)
+      const damp = Math.max(0, 1.0 - PHYSICS_CONFIG.COLLISION_YAW_DAMPING * safeDt);
+      this.yawRate *= damp;
+      this.yawRate = Math.max(-PHYSICS_CONFIG.MAX_YAW_RATE, Math.min(PHYSICS_CONFIG.MAX_YAW_RATE, this.yawRate));
+
       this.speed = Math.hypot(this.vx, this.vy);
     } else {
       this.isWallContacting = false;
+      this.wallNormal = null;
     }
   }
 }
