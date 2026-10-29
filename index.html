@@ -619,7 +619,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 1.3.1</div>
+        <div class="title-version">ver 1.4.0</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">GRAB & DASH</div>
       </div>
@@ -650,6 +650,10 @@
       <div class="dbg-row"><span>モード:</span><span class="dbg-val" id="dbgMode">待機</span></div>
       <div class="dbg-row"><span>現在速度:</span><span class="dbg-val" id="dbgSpeed">0.00 px/f (0 km/h)</span></div>
       <div class="dbg-row"><span>速度上限:</span><span class="dbg-val" id="dbgMaxSpeed">0.00 px/f</span></div>
+      <div class="dbg-row"><span>角速度:</span><span class="dbg-val" id="dbgYawRate">0.00 rad/s</span></div>
+      <div class="dbg-row"><span>リア横速度:</span><span class="dbg-val" id="dbgRearVLat">0.0 px/s</span></div>
+      <div class="dbg-row"><span>スリップ角(前/後):</span><span class="dbg-val" id="dbgSlipAngles">0.0° / 0.0°</span></div>
+      <div class="dbg-row"><span>壁接触フラグ:</span><span class="dbg-val" id="dbgWallContact">離脱 (NO)</span></div>
       <div class="dbg-row"><span>目標距離:</span><span class="dbg-val" id="dbgDist">--</span></div>
       <div class="dbg-row"><span>サブステップ:</span><span class="dbg-val" id="dbgSteps">1</span></div>
       <div class="dbg-row"><span>dt:</span><span class="dbg-val" id="dbgDt">16.7 ms</span></div>
@@ -773,12 +777,16 @@ const PHYSICS_CONFIG = {
   BOOST_STAGE_DISTANCES: [0, 500, 1500],       // Lv.1: 0m〜, Lv.2: 500m〜, Lv.3: 1500m〜
   BOOST_SPEED_MULTIPLIERS: [1.0, 1.25, 1.55],  // Lv.1: 1.00倍, Lv.2: 1.25倍, Lv.3: 1.55倍
 
-  // 3. 車をつかむ追従・平滑化パラメータ
+  // 3. 車をつかむ追従・平滑化パラメータ & タイヤグリップ
   GRAB_SPRING_FREQ: 28.0,           // 強いバネ（臨界減衰に近く、遅れは数フレーム以内、指にほぼ1:1）
   GRAB_SMOOTH_TIME_SEC: 0.020,      // 指座標の平滑化時定数 (20ms)
   CAMERA_RECOVER_TIME_SEC: 0.30,    // 指を離した後のカメラ復帰補間時間（約0.3秒）
   CG_REAR_OFFSET_RATIO: 0.30,       // 車体の回転中心（重心）のリア寄りオフセット率（車長の30%）
-  REAR_LATERAL_GRIP: 0.60,          // リアの横方向グリップ減衰係数（通常値0.85の約70%）
+  FRONT_GRIP: 28.0,                 // 前軸グリップ係数 (1/s)
+  REAR_LATERAL_GRIP: 15.0,          // 後軸グリップ係数 (前軸の約54%)
+  MAX_ANGULAR_VELOCITY_GRAB: 10.0,  // つかんでいる間の角速度上限 (10.0 rad/s)
+  ANGULAR_DAMPING_FREE: 0.05,       // 通常時の角速度減衰 (毎秒5%程度)
+  ANGULAR_DAMPING_CONTACT: 0.30,    // 壁接触中の角速度減衰 (毎秒30%程度)
 
   // 4. 直線ダッシュ走行定数
   DASH_ACCEL_POWER_RATIO: 2.2,      // 直線ダッシュ加速推力（車長単位。キビキビと鋭く加速）
@@ -1321,6 +1329,9 @@ class Car {
     this.wallSpeedLimitTimer = 0;  // 壁離脱後の速度上限復帰タイマー
     this.screenShakeRequested = false; // 画面シェイクリクエストフラグ
     this.yawRate = 0;             // 車体角速度 (剛体回転用)
+    this.vLatRear = 0;            // リア軸横速度 (px/s)
+    this.slipFront = 0;           // 前軸スリップ角 (deg)
+    this.slipRear = 0;            // 後軸スリップ角 (deg)
     this.mass = 1.0;              // 車両質量
     this.dashStuckTimer = 0;      // 壁スタック検知タイマー
     this.lastMinDashDist = Infinity;
@@ -1442,77 +1453,113 @@ class Car {
 
     if (this.isGrabbed && grabTargetSmooth) {
       // =========================================================================
-      // ① 車をつかんでいるときの挙動（Grab Mode）
-      // 指の位置を目標にして、車の前方の先端を目標へ引っ張る。
-      // 回転中心(重心)を車長の30%リア寄りに置き、リアの横グリップ(REAR_LATERAL_GRIP)でリアを振る
-      // 追従は指にほぼ1:1 (臨界減衰バネ、遅れは数フレーム以内)
-      // つかんでいる間の速度上限は、直進ダッシュの最高速の85%
+      // ① 車をつかんでいるときの挙動（Grab Mode: 完全剛体力学モデル）
+      // 指に向かうバネの力を車の前方の先端の1点にかけ、線形加速度と回転トルク(τ = r × F)に反映
+      // 車体の向きは剛体の回転の結果だけで決め、直接の代入や補間は一切しない
+      // 前軸・後軸にタイヤ横力を与え、前軸グリップ高・後軸グリップ低でリアが豪快に振れる
+      // つかんでいる間の角速度上限は10rad/s、通常減衰は毎秒5%程度
       // =========================================================================
       this.stopDash();
+      let maxAllowedSpeed = maxGrabSpeed;
+      this.lastMaxAllowedSpeed = maxAllowedSpeed;
 
-      const halfL = this.length / 2;
-      const noseX = this.x + Math.cos(this.heading) * halfL;
-      const noseY = this.y + Math.sin(this.heading) * halfL;
+      const m = this.mass || 1.0;
+      const I = this.inertia;
 
-      // 車体の回転の中心(重心)を、車長の30%だけリア寄りに置く
+      // 車体ベクトル
+      const cosH = Math.cos(this.heading);
+      const sinH = Math.sin(this.heading);
+      const uLongX = cosH, uLongY = sinH; // 長手方向 (前方)
+      const nLatX = -sinH, nLatY = cosH;  // 横方向 (左方)
+
+      // 重心位置 (幾何中心から車長の30%リア寄り)
       const cgOffset = this.length * PHYSICS_CONFIG.CG_REAR_OFFSET_RATIO;
-      const cgX = this.x - Math.cos(this.heading) * cgOffset;
-      const cgY = this.y - Math.sin(this.heading) * cgOffset;
+      const cgX = this.x - uLongX * cgOffset;
+      const cgY = this.y - uLongY * cgOffset;
 
-      // 先端から目標への変位
+      // 先端位置 (ノーズ)
+      const halfL = this.length / 2;
+      const noseX = this.x + uLongX * halfL;
+      const noseY = this.y + uLongY * halfL;
+
+      // 先端の腕ベクトル (重心から先端へ)
+      const rxNose = noseX - cgX;
+      const ryNose = noseY - cgY;
+
+      // 重心速度および先端速度 (px/s)
+      const invDt = safeDt > 0.0001 ? (1.0 / safeDt) : 60.0;
+      const vxSec = this.vx * invDt;
+      const vySec = this.vy * invDt;
+      const vNoseX = vxSec - this.yawRate * ryNose;
+      const vNoseY = vySec + this.yawRate * rxNose;
+
+      // 指（目標）までの変位
       const diffX = grabTargetSmooth.x - noseX;
       const diffY = grabTargetSmooth.y - noseY;
-      const distToTarget = Math.hypot(diffX, diffY);
 
-      // バネによる先端の移動速度指令 (臨界減衰バネ: GRAB_SPRING_FREQ)
-      let pullSpeed = distToTarget * PHYSICS_CONFIG.GRAB_SPRING_FREQ;
-      // 速度上限: 直線ダッシュ最高速の85%
-      const speedLimitPxPerSec = maxGrabSpeed * 60;
-      if (pullSpeed > speedLimitPxPerSec) {
-        pullSpeed = speedLimitPxPerSec;
-      }
+      // 臨界減衰バネ牽引力 (指に向かうバネの力を先端の1点にかける)
+      const freq = PHYSICS_CONFIG.GRAB_SPRING_FREQ;
+      const K = freq * freq;
+      const C = 2.0 * freq;
+      let fxPull = diffX * K - vNoseX * C;
+      let fyPull = diffY * K - vNoseY * C;
 
-      let moveDist = pullSpeed * safeDt;
-      if (moveDist > distToTarget) moveDist = distToTarget;
+      // 前軸・後軸の位置 (重心からの相対位置)
+      const rxFront = uLongX * (halfL * 0.70 + cgOffset);
+      const ryFront = uLongY * (halfL * 0.70 + cgOffset);
+      const rxRear = -uLongX * (halfL * 0.70 - cgOffset);
+      const ryRear = -uLongY * (halfL * 0.70 - cgOffset);
 
-      let newNoseX = noseX;
-      let newNoseY = noseY;
-      if (distToTarget > 0.001) {
-        newNoseX += (diffX / distToTarget) * moveDist;
-        newNoseY += (diffY / distToTarget) * moveDist;
-      }
+      // 各軸での速度 (v + ω × r)
+      const vFrontX = vxSec - this.yawRate * ryFront;
+      const vFrontY = vySec + this.yawRate * rxFront;
+      const vRearX = vxSec - this.yawRate * ryRear;
+      const vRearY = vySec + this.yawRate * rxRear;
 
-      // 重心から見た新しい先端の向き
-      const targetHeading = Math.atan2(newNoseY - cgY, newNoseX - cgX);
-      const angleDiff = normalizeAngle(targetHeading - this.heading);
+      // 各軸での横方向の速度 v_lat = (v + ω×r)·(車体の横方向)
+      const vLatFront = vFrontX * nLatX + vFrontY * nLatY;
+      const vLatRear = vRearX * nLatX + vRearY * nLatY;
+      this.vLatRear = vLatRear;
 
-      // 指が急に向きを変えたとき、リアが外側へ流れ、少し遅れて追いつくダイナミクス (不足減衰系)
-      // 先端牽引トルク係数 K、リア横グリップダンピング C
-      const springK = 260.0;
-      const baseDamp = 36.0 * (PHYSICS_CONFIG.REAR_LATERAL_GRIP / 0.85);
+      // 各軸でのスリップ角 (deg)
+      const vLongFront = vFrontX * uLongX + vFrontY * uLongY;
+      const vLongRear = vRearX * uLongX + vRearY * uLongY;
+      this.slipFront = Math.atan2(vLatFront, Math.abs(vLongFront) + 1.0) * (180 / Math.PI);
+      this.slipRear = Math.atan2(vLatRear, Math.abs(vLongRear) + 1.0) * (180 / Math.PI);
 
-      const angularAccel = angleDiff * springK - (this.yawRate || 0) * baseDamp;
-      this.yawRate = (this.yawRate || 0) + angularAccel * safeDt;
+      // タイヤ横力 = -軸のグリップ係数 × m × v_lat
+      let fLatFront = -PHYSICS_CONFIG.FRONT_GRIP * m * vLatFront;
+      let fLatRear = -PHYSICS_CONFIG.REAR_LATERAL_GRIP * m * vLatRear;
 
-      // 角速度の上限 (暴走防止)
-      this.yawRate = Math.max(-25, Math.min(25, this.yawRate));
+      // 最大の横力でクランプ (超えたら滑る)
+      const maxFLatFront = m * 550.0;
+      const maxFLatRear = m * 320.0;
+      fLatFront = Math.max(-maxFLatFront, Math.min(maxFLatFront, fLatFront));
+      fLatRear = Math.max(-maxFLatRear, Math.min(maxFLatRear, fLatRear));
+
+      // 力とトルクの合成 (線形の加速度と回転のトルク τ = r × F)
+      const fxTotal = fxPull + (fLatFront + fLatRear) * nLatX;
+      const fyTotal = fyPull + (fLatFront + fLatRear) * nLatY;
+
+      const tauPull = rxNose * fyPull - ryNose * fxPull;
+      const tauFront = rxFront * (fLatFront * nLatY) - ryFront * (fLatFront * nLatX);
+      const tauRear = rxRear * (fLatRear * nLatY) - ryRear * (fLatRear * nLatX);
+      const tauTotal = tauPull + tauFront + tauRear;
+
+      // 剛体運動方程式の積分 (車体の向きは直接代入せず、剛体回転の結果だけで決める)
+      this.vx += (fxTotal / m) * safeDt * safeDt;
+      this.vy += (fyTotal / m) * safeDt * safeDt;
+      this.yawRate += (tauTotal / I) * safeDt;
+
+      // つかんでいる間の角速度上限は10rad/s、通常減衰は毎秒5%
+      this.yawRate *= Math.max(0, 1.0 - PHYSICS_CONFIG.ANGULAR_DAMPING_FREE * safeDt);
+      this.yawRate = Math.max(-PHYSICS_CONFIG.MAX_ANGULAR_VELOCITY_GRAB, Math.min(PHYSICS_CONFIG.MAX_ANGULAR_VELOCITY_GRAB, this.yawRate));
 
       // 車体角度の更新
       this.heading = normalizeAngle(this.heading + this.yawRate * safeDt);
 
-      const oldX = this.x;
-      const oldY = this.y;
-      // 先端位置と更新された車体角度から車体中心座標を算出
-      this.x = newNoseX - Math.cos(this.heading) * halfL;
-      this.y = newNoseY - Math.sin(this.heading) * halfL;
-
-      // 速度ベクトルを更新 (px/frame に統一)
-      this.vx = this.x - oldX;
-      this.vy = this.y - oldY;
+      // 速度クランプ (maxGrabSpeed)
       this.speed = Math.hypot(this.vx, this.vy);
-
-      // 速度クランプ（maxGrabSpeed）
-      this.lastMaxAllowedSpeed = maxGrabSpeed;
       if (this.speed > maxGrabSpeed && this.speed > 0.0001) {
         const s = maxGrabSpeed / this.speed;
         this.vx *= s;
@@ -1520,9 +1567,9 @@ class Car {
         this.speed = maxGrabSpeed;
       }
 
-      const rearX = this.x - Math.cos(this.heading) * halfL;
-      const rearY = this.y - Math.sin(this.heading) * halfL;
-      if ((Math.abs(this.yawRate) > 3.0 || this.speed > 2.0) && Math.random() < 0.35) {
+      const rearX = this.x - uLongX * halfL;
+      const rearY = this.y - uLongY * halfL;
+      if ((Math.abs(this.yawRate) > 2.5 || Math.abs(vLatRear) > 120) && Math.random() < 0.45) {
         particles.addSmoke(rearX, rearY, this.heading, this.width);
       }
     } else {
@@ -1608,10 +1655,11 @@ class Car {
         }
       }
 
-      // 剛体インパルスによる角速度の反映と自然減衰
+      // 剛体インパルスによる角速度の反映と通常減衰 (毎秒5%程度)
       this.heading = normalizeAngle(this.heading + this.yawRate * safeDt);
       if (!this.isWallContacting) {
-        this.yawRate *= Math.max(0, 1.0 - 5.0 * safeDt);
+        this.yawRate *= Math.max(0, 1.0 - PHYSICS_CONFIG.ANGULAR_DAMPING_FREE * safeDt);
+        this.yawRate = Math.max(-PHYSICS_CONFIG.MAX_ANGULAR_VELOCITY_GRAB, Math.min(PHYSICS_CONFIG.MAX_ANGULAR_VELOCITY_GRAB, this.yawRate));
       }
 
       // 舵を切っておらず角速度も落ち着いている間は車体の向きを速度ベクトルの方向へ寄せる
@@ -2838,6 +2886,10 @@ class TougeGame {
     const mEl = document.getElementById('dbgMode');
     const sEl = document.getElementById('dbgSpeed');
     const msEl = document.getElementById('dbgMaxSpeed');
+    const yawEl = document.getElementById('dbgYawRate');
+    const rvlEl = document.getElementById('dbgRearVLat');
+    const slipEl = document.getElementById('dbgSlipAngles');
+    const wallEl = document.getElementById('dbgWallContact');
     const dEl = document.getElementById('dbgDist');
     const stEl = document.getElementById('dbgSteps');
     const dtEl = document.getElementById('dbgDt');
@@ -2845,6 +2897,17 @@ class TougeGame {
     if (mEl) mEl.textContent = modeText;
     if (sEl) sEl.textContent = `${speedPx} px/f (${speedKm} km/h)`;
     if (msEl) msEl.textContent = `${maxSpeed} px/f`;
+    if (yawEl) yawEl.textContent = `${(this.car.yawRate || 0).toFixed(2)} rad/s`;
+    if (rvlEl) rvlEl.textContent = `${(this.car.vLatRear || 0).toFixed(1)} px/s`;
+    if (slipEl) {
+      const sf = (this.car.slipFront || 0).toFixed(1);
+      const sr = (this.car.slipRear || 0).toFixed(1);
+      slipEl.textContent = `${sf}° / ${sr}°`;
+    }
+    if (wallEl) {
+      wallEl.textContent = this.car.isWallContacting ? '接触中 (YES)' : '離脱 (NO)';
+      wallEl.style.color = this.car.isWallContacting ? '#ff1744' : '#00e676';
+    }
     if (dEl) dEl.textContent = distText;
     if (stEl) stEl.textContent = `${steps}`;
     if (dtEl) dtEl.textContent = `${dtMs} ms`;
