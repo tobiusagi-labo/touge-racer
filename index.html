@@ -619,7 +619,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 1.3.0</div>
+        <div class="title-version">ver 1.3.1</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">GRAB & DASH</div>
       </div>
@@ -795,23 +795,23 @@ const PHYSICS_CONFIG = {
 
   // 6. 壁衝突・剛体物理パラメータ (接触点インパルス法 & 減速・ペナルティ)
   WALL_RESTITUTION: 0.05,           // 壁との反発係数 (0.05程度)
-  WALL_FRICTION: 0.50,              // 壁沿いの摩擦係数 (0.10から0.50に引き上げ)
+  WALL_FRICTION: 0.80,              // 壁沿いの摩擦係数 (0.50から0.80へ引き上げ、壁沿いスライドを強力に制動)
   HEADON_TORQUE_YAW: 0.5,           // 正対衝突時の微小角速度 (0.5rad/s)
   MAX_YAW_RATE: 6.0,                // 角速度上限 (6.0rad/s)
   COLLISION_YAW_DAMPING: 0.30,      // 衝突中の角速度減衰 (毎秒30%程度)
   DASH_STUCK_TIMEOUT: 0.5,          // 壁スタック時のダッシュ目標破棄時間 (0.5秒)
 
-  // 壁接触減速・ペナルティ定数
-  WALL_HIT_BASE_DECEL: 0.15,        // 衝突瞬間の基本減速率 (15%)
+  // 壁接触減速・ペナルティ定数 (壁走りの強力な抑制)
+  WALL_HIT_BASE_DECEL: 0.30,        // 衝突瞬間の基本減速率 (15%から30%へ倍増)
   WALL_HIT_VN_DECEL_RATE: 0.50,     // 壁へ向かう成分が最高速に占める割合に対する減速倍率 (50%)
-  WALL_HIT_MAX_DECEL: 0.60,         // 衝突瞬間の減速率上限 (60%)
-  WALL_CONTINUOUS_DAMPING: 0.40,    // 壁接触中の継続減衰率 (毎秒40%)
-  WALL_CONTACT_MAX_SPEED_RATIO: 0.60, // 壁接触中の最高速度比率 (通常の60%)
-  WALL_SPEED_LIMIT_RECOVERY_TIME: 0.50, // 接触終了後の最高速度復帰時間 (0.5秒)
-  WALL_THRUST_RATIO: 0.30,          // 壁接触中の推力比率 (通常の30%)
-  WALL_STAGE_DOWN_INTERVAL: 0.50,   // 壁接触継続時のダッシュ段階ダウン間隔 (0.5秒)
-  SCREEN_SHAKE_DURATION: 0.10,      // 衝突瞬間の画面シェイク持続時間 (0.1秒)
-  SCREEN_SHAKE_MAGNITUDE: 6.0,      // 画面シェイク振幅 (px)
+  WALL_HIT_MAX_DECEL: 0.75,         // 衝突瞬間の減速率上限 (60%から75%へ引き上げ)
+  WALL_CONTINUOUS_DAMPING: 0.75,    // 壁接触中の継続減衰率 (毎秒40%から毎秒75%へ大幅強化)
+  WALL_CONTACT_MAX_SPEED_RATIO: 0.40, // 壁接触中の最高速度比率 (通常の60%から40%へ引き下げ)
+  WALL_SPEED_LIMIT_RECOVERY_TIME: 0.80, // 接触終了後の最高速度復帰時間 (0.5秒から0.8秒へ延長)
+  WALL_THRUST_RATIO: 0.15,          // 壁接触中の推力比率 (通常の30%から15%へ半減)
+  WALL_STAGE_DOWN_INTERVAL: 0.35,   // 壁接触継続時のダッシュ段階ダウン間隔 (0.5秒から0.35秒へ短縮)
+  SCREEN_SHAKE_DURATION: 0.12,      // 衝突瞬間の画面シェイク持続時間 (0.12秒)
+  SCREEN_SHAKE_MAGNITUDE: 7.5,      // 画面シェイク振幅 (px)
 
   // 7. 視点ドラッグ定数
   ROTATE_DRAG_THRESHOLD_PX: 10,     // 視点回転を開始する最小ドラッグ移動量 (10px)
