@@ -556,6 +556,45 @@
       padding: 4px 6px;
       border-radius: 4px;
     }
+
+    /* Debug Overlay (?debug=1 のみ) */
+    #debug-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(10, 16, 12, 0.88);
+      border: 1px solid rgba(0, 230, 118, 0.6);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: 'SF Pro Text', -apple-system, monospace;
+      font-size: 11px;
+      color: #e0f2e9;
+      line-height: 1.5;
+      z-index: 100;
+      pointer-events: none;
+      display: none;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+      min-width: 190px;
+    }
+    #debug-overlay .dbg-title {
+      font-weight: 700;
+      color: #00e676;
+      margin-bottom: 4px;
+      border-bottom: 1px solid rgba(0, 230, 118, 0.3);
+      padding-bottom: 3px;
+      letter-spacing: 0.5px;
+    }
+    #debug-overlay .dbg-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    #debug-overlay .dbg-val {
+      font-weight: 700;
+      color: #ffeb3b;
+      font-variant-numeric: tabular-nums;
+    }
   </style>
 </head>
 <body>
@@ -603,6 +642,17 @@
       <div class="title-start-area">
         <button class="title-start-btn" id="btnStartGame" type="button">START GAME</button>
       </div>
+    </div>
+
+    <!-- Debug Overlay (?debug=1 のみ表示) -->
+    <div id="debug-overlay">
+      <div class="dbg-title">🛠️ DEBUG MONITOR</div>
+      <div class="dbg-row"><span>モード:</span><span class="dbg-val" id="dbgMode">待機</span></div>
+      <div class="dbg-row"><span>現在速度:</span><span class="dbg-val" id="dbgSpeed">0.00 px/f (0 km/h)</span></div>
+      <div class="dbg-row"><span>速度上限:</span><span class="dbg-val" id="dbgMaxSpeed">0.00 px/f</span></div>
+      <div class="dbg-row"><span>目標距離:</span><span class="dbg-val" id="dbgDist">--</span></div>
+      <div class="dbg-row"><span>サブステップ:</span><span class="dbg-val" id="dbgSteps">1</span></div>
+      <div class="dbg-row"><span>dt:</span><span class="dbg-val" id="dbgDt">16.7 ms</span></div>
     </div>
 
     <!-- Game HUD -->
@@ -722,7 +772,7 @@ const PHYSICS_CONFIG = {
   CAMERA_RECOVER_TIME_SEC: 0.30,    // 指を離した後のカメラ復帰補間時間（約0.3秒）
 
   // 4. 直線ダッシュ走行定数
-  DASH_ACCEL_POWER_RATIO: 1.4,      // 直線ダッシュ加速推力（車長単位）
+  DASH_ACCEL_POWER_RATIO: 2.2,      // 直線ダッシュ加速推力（車長単位。キビキビと鋭く加速）
   DASH_MAX_DURATION: 1.5,           // 1回のダッシュ最大持続時間（1.5秒）
   ARRIVAL_DIST_RATIO: 0.85,         // ダッシュ目標到達判定距離（車長 × 0.85）
   TURN_SPEED: 0.12,                 // 直進ダッシュ中の車体旋回速度（rad/frame）
@@ -1183,12 +1233,13 @@ class Car {
       this.x = newNoseX - Math.cos(this.heading) * halfL;
       this.y = newNoseY - Math.sin(this.heading) * halfL;
 
-      // 速度ベクトルを更新
-      this.vx = (this.x - oldX) / safeDt;
-      this.vy = (this.y - oldY) / safeDt;
+      // 速度ベクトルを更新 (px/frame に統一)
+      this.vx = this.x - oldX;
+      this.vy = this.y - oldY;
       this.speed = Math.hypot(this.vx, this.vy);
 
       // 速度クランプ（maxGrabSpeed）
+      this.lastMaxAllowedSpeed = maxGrabSpeed;
       if (this.speed > maxGrabSpeed && this.speed > 0.0001) {
         const s = maxGrabSpeed / this.speed;
         this.vx *= s;
@@ -1204,6 +1255,7 @@ class Car {
       // ② 直線ダッシュ（Dash Mode）または 慣性走行
       // =========================================================================
       let maxAllowedSpeed = maxStraightSpeed;
+      this.lastMaxAllowedSpeed = maxAllowedSpeed;
 
       if (this.targetPos) {
         this.dashTimer += safeDt;
@@ -1277,12 +1329,16 @@ class Car {
       }
     }
 
-    // 移動と衝突のサブステップ分割 (安全のため)
+    // 移動と衝突のサブステップ分割 (最大8回、NaN・無限大・厚み0ガード)
     const frameDist = Math.hypot(this.vx, this.vy);
     const maxStepDist = Math.max(2.0, this.length * 0.1);
-    const steps = Math.max(1, Math.ceil(frameDist / maxStepDist));
-    const stepDx = (this.vx * safeDt) / steps;
-    const stepDy = (this.vy * safeDt) / steps;
+    const rawSteps = frameDist / maxStepDist;
+    const steps = Math.min(8, Math.max(1, Number.isFinite(rawSteps) ? Math.ceil(rawSteps) : 1));
+    this.lastSteps = steps;
+
+    // 1フレームあたりの移動量をサブステップ数で等分 (safeDtを二重掛けしない)
+    const stepDx = this.vx / steps;
+    const stepDy = this.vy / steps;
 
     if (this.isGrabbed) {
       if (gameMode === 'TOUGE') {
@@ -1490,14 +1546,17 @@ class TougeGame {
     this.gameMode = 'FREE';
     this.appState = 'TITLE';
 
-    // 表示調整モード (?tune=1)
+    // 表示調整モード (?tune=1) および デバッグモード (?debug=1)
     const urlParams = new URLSearchParams(window.location.search);
     this.isTuneMode = urlParams.get('tune') === '1';
+    this.isDebugMode = urlParams.get('debug') === '1';
     this.tuneConfig = {
       COURSE_SCALE: PHYSICS_CONFIG.DEFAULT_COURSE_SCALE,
       CAR_SIZE: PHYSICS_CONFIG.DEFAULT_CAR_SIZE,
       CAMERA_DISTANCE: PHYSICS_CONFIG.DEFAULT_CAMERA_DISTANCE
     };
+
+    this.animId = null; // 単一ゲームループID
 
     this.track = new Track(this.tuneConfig.COURSE_SCALE);
     this.skidpad = new SkidpadArea();
@@ -1537,8 +1596,6 @@ class TougeGame {
     }
     this.resize();
     this.drawTitleHero();
-
-    requestAnimationFrame(() => this.loop());
   }
 
   initTunePanel() {
@@ -1707,13 +1764,33 @@ class TougeGame {
     this.btnBackToTitle.addEventListener('click', (e) => {
       e.stopPropagation();
       this.triggerShutterTransition(() => {
+        // ゲームループの停止 (cancelAnimationFrame)
+        this.stopLoop();
         this.appState = 'TITLE';
-        this.car.endDrift();
+
+        // 車・入力・カメラ・エフェクト状態の完全リセット
+        this.car.reset();
+        this.interactionMode = null;
+        this.isPointerDown = false;
+        this.currentPointerScreen = null;
+        this.rotateStartScreen = null;
+        this.grabTargetRaw = { x: 0, y: 0 };
+        this.grabTargetSmooth = { x: 0, y: 0 };
+        this.dragTrail = [];
+        this.cameraRecoverTimer = 0;
+        this.cameraAngle = 0;
+        this.camera = { x: 0, y: 0 };
+        this.tapIndicator = null;
+
         this.gameModal.style.display = 'none';
         this.gameHud.style.display = 'none';
         const tunePanel = document.getElementById('tune-panel');
         if (tunePanel) tunePanel.style.display = 'none';
         document.body.classList.remove('tune-active');
+
+        const debugOverlay = document.getElementById('debug-overlay');
+        if (debugOverlay) debugOverlay.style.display = 'none';
+
         this.titleScreen.style.display = 'flex';
         this.drawTitleHero();
       });
@@ -1974,6 +2051,40 @@ class TougeGame {
     this.maxComboAchieved = 0;
     this.applyModeSpawn();
     this.updateHUDModeUI();
+    this.startLoop();
+  }
+
+  startLoop() {
+    // 既存のループがあれば必ずキャンセルして二重起動を防止
+    this.stopLoop();
+
+    const tick = () => {
+      if (this.appState !== 'PLAYING') {
+        this.animId = null;
+        return;
+      }
+      try {
+        this.update();
+        this.render();
+      } catch (err) {
+        console.error(err);
+        const eb = document.getElementById('errorBanner');
+        if (eb) {
+          eb.style.display = 'block';
+          eb.textContent = `Loop error: ${err.message}`;
+        }
+      }
+      this.animId = requestAnimationFrame(tick);
+    };
+
+    this.animId = requestAnimationFrame(tick);
+  }
+
+  stopLoop() {
+    if (this.animId !== null) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
   }
 
   applyModeSpawn() {
@@ -2047,21 +2158,6 @@ class TougeGame {
     }
   }
 
-  loop() {
-    try {
-      this.update();
-      this.render();
-    } catch(err) {
-      console.error(err);
-      const eb = document.getElementById('errorBanner');
-      if (eb) {
-        eb.style.display = 'block';
-        eb.textContent = `Loop error: ${err.message}`;
-      }
-    }
-    requestAnimationFrame(() => this.loop());
-  }
-
   update() {
     const now = performance.now();
     if (this.appState === 'TITLE') {
@@ -2124,6 +2220,56 @@ class TougeGame {
       this.tapIndicator.alpha -= 0.06;
       if (this.tapIndicator.alpha <= 0) this.tapIndicator = null;
     }
+
+    // デバッグオーバーレイの更新 (?debug=1 のみ)
+    this.updateDebugOverlay(dt);
+  }
+
+  updateDebugOverlay(dt) {
+    if (!this.isDebugMode) return;
+    const dbg = document.getElementById('debug-overlay');
+    if (!dbg) return;
+    if (this.appState !== 'PLAYING') {
+      dbg.style.display = 'none';
+      return;
+    }
+    dbg.style.display = 'block';
+
+    let modeText = '待機';
+    if (this.car.isGrabbed) {
+      modeText = 'つかみ';
+    } else if (this.car.targetPos) {
+      modeText = 'ダッシュ';
+    } else if (this.car.speed > 0.5) {
+      modeText = '滑り';
+    }
+
+    const speedPx = this.car.speed.toFixed(2);
+    const speedKm = Math.round(this.car.speed * 18);
+    const maxSpeed = (this.car.lastMaxAllowedSpeed || 0).toFixed(2);
+
+    let distText = '--';
+    if (this.car.targetPos) {
+      const d = Math.hypot(this.car.targetPos.x - this.car.x, this.car.targetPos.y - this.car.y);
+      distText = `${d.toFixed(1)} px`;
+    }
+
+    const steps = this.car.lastSteps || 1;
+    const dtMs = (dt * 1000).toFixed(1);
+
+    const mEl = document.getElementById('dbgMode');
+    const sEl = document.getElementById('dbgSpeed');
+    const msEl = document.getElementById('dbgMaxSpeed');
+    const dEl = document.getElementById('dbgDist');
+    const stEl = document.getElementById('dbgSteps');
+    const dtEl = document.getElementById('dbgDt');
+
+    if (mEl) mEl.textContent = modeText;
+    if (sEl) sEl.textContent = `${speedPx} px/f (${speedKm} km/h)`;
+    if (msEl) msEl.textContent = `${maxSpeed} px/f`;
+    if (dEl) dEl.textContent = distText;
+    if (stEl) stEl.textContent = `${steps}`;
+    if (dtEl) dtEl.textContent = `${dtMs} ms`;
   }
 
   render() {
