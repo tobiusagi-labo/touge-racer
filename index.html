@@ -662,18 +662,18 @@
       <div id="tuneBody" class="tune-body">
         <div class="tune-row">
           <label>コーススケール</label>
-          <input type="range" id="tuneCourseScale" min="0.5" max="2.0" step="0.05" value="1.0">
-          <span class="tune-val" id="tuneCourseScaleVal">1.00</span>
+          <input type="range" id="tuneCourseScale" min="0.5" max="2.0" step="0.05" value="0.5">
+          <span class="tune-val" id="tuneCourseScaleVal">0.50</span>
         </div>
         <div class="tune-row">
           <label>車のサイズ</label>
-          <input type="range" id="tuneCarSize" min="0.5" max="2.0" step="0.05" value="1.0">
-          <span class="tune-val" id="tuneCarSizeVal">1.00</span>
+          <input type="range" id="tuneCarSize" min="0.5" max="2.0" step="0.05" value="1.35">
+          <span class="tune-val" id="tuneCarSizeVal">1.35</span>
         </div>
         <div class="tune-row">
           <label>視点の距離 (ズーム)</label>
-          <input type="range" id="tuneCameraDist" min="0.5" max="2.0" step="0.05" value="1.0">
-          <span class="tune-val" id="tuneCameraDistVal">1.00</span>
+          <input type="range" id="tuneCameraDist" min="0.5" max="2.0" step="0.05" value="1.2">
+          <span class="tune-val" id="tuneCameraDistVal">1.20</span>
         </div>
         <div class="tune-actions">
           <button id="tuneCopyBtn" type="button" class="tune-btn">📋 値をコピー (JSON)</button>
@@ -692,6 +692,11 @@
    車両・操作パラメータ定数（ここを変更して挙動を自由に調整できます）
    ========================================================================== */
 const PHYSICS_CONFIG = {
+  // 画面・表示基準設定（初期デフォルト）
+  DEFAULT_COURSE_SCALE: 0.5,
+  DEFAULT_CAR_SIZE: 1.35,
+  DEFAULT_CAMERA_DISTANCE: 1.2,
+
   // コース進行方向設定 (false: 上から下へ走る, true: 反転して下から上へ走る)
   TRACK_INVERT_DIRECTION: false,
 
@@ -1618,9 +1623,9 @@ class TougeGame {
     const urlParams = new URLSearchParams(window.location.search);
     this.isTuneMode = urlParams.get('tune') === '1';
     this.tuneConfig = {
-      COURSE_SCALE: 1.0,
-      CAR_SIZE: 1.0,
-      CAMERA_DISTANCE: 1.0
+      COURSE_SCALE: PHYSICS_CONFIG.DEFAULT_COURSE_SCALE,
+      CAR_SIZE: PHYSICS_CONFIG.DEFAULT_CAR_SIZE,
+      CAMERA_DISTANCE: PHYSICS_CONFIG.DEFAULT_CAMERA_DISTANCE
     };
 
     this.cameraFreeMode = false;
@@ -1758,20 +1763,20 @@ class TougeGame {
 
     if (btnReset) {
       btnReset.addEventListener('click', () => {
-        this.tuneConfig.COURSE_SCALE = 1.0;
-        this.tuneConfig.CAR_SIZE = 1.0;
-        this.tuneConfig.CAMERA_DISTANCE = 1.0;
+        this.tuneConfig.COURSE_SCALE = PHYSICS_CONFIG.DEFAULT_COURSE_SCALE;
+        this.tuneConfig.CAR_SIZE = PHYSICS_CONFIG.DEFAULT_CAR_SIZE;
+        this.tuneConfig.CAMERA_DISTANCE = PHYSICS_CONFIG.DEFAULT_CAMERA_DISTANCE;
 
-        if (sCourse) sCourse.value = 1.0;
-        if (vCourse) vCourse.textContent = '1.00';
-        this.track.generate(1.0);
+        if (sCourse) sCourse.value = PHYSICS_CONFIG.DEFAULT_COURSE_SCALE;
+        if (vCourse) vCourse.textContent = PHYSICS_CONFIG.DEFAULT_COURSE_SCALE.toFixed(2);
+        this.track.generate(PHYSICS_CONFIG.DEFAULT_COURSE_SCALE);
 
-        if (sCar) sCar.value = 1.0;
-        if (vCar) vCar.textContent = '1.00';
-        this.car.updateSize(1.0);
+        if (sCar) sCar.value = PHYSICS_CONFIG.DEFAULT_CAR_SIZE;
+        if (vCar) vCar.textContent = PHYSICS_CONFIG.DEFAULT_CAR_SIZE.toFixed(2);
+        this.car.updateSize(PHYSICS_CONFIG.DEFAULT_CAR_SIZE);
 
-        if (sCam) sCam.value = 1.0;
-        if (vCam) vCam.textContent = '1.00';
+        if (sCam) sCam.value = PHYSICS_CONFIG.DEFAULT_CAMERA_DISTANCE;
+        if (vCam) vCam.textContent = PHYSICS_CONFIG.DEFAULT_CAMERA_DISTANCE.toFixed(2);
 
         this.cameraFreeMode = false;
         if (btnCamMode) {
