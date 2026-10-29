@@ -445,6 +445,107 @@
       z-index: 999;
       word-break: break-all;
     }
+
+    /* ==========================================================================
+       Tune Panel (?tune=1)
+       ========================================================================== */
+    #tune-panel {
+      display: none;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(12, 18, 14, 0.94);
+      border-top: 2px solid #00e676;
+      border-radius: 16px 16px 0 0;
+      padding: 10px 14px;
+      z-index: 120;
+      color: #e2ede5;
+      font-size: 11px;
+      box-shadow: 0 -8px 24px rgba(0,0,0,0.6);
+      touch-action: auto;
+      pointer-events: auto;
+    }
+    .tune-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #00e676;
+    }
+    .tune-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .tune-row label {
+      flex: 0 0 115px;
+      font-size: 11px;
+      color: #bbb;
+    }
+    .tune-row input[type="range"] {
+      flex: 1;
+      height: 6px;
+      accent-color: #00e676;
+      cursor: pointer;
+    }
+    .tune-val {
+      flex: 0 0 38px;
+      text-align: right;
+      font-family: monospace;
+      font-weight: bold;
+      color: #ffeb3b;
+    }
+    .tune-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .tune-btn {
+      flex: 1;
+      background: #00e676;
+      color: #0c120e;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .tune-btn-sub {
+      flex: 0 0 70px;
+      background: #2b3a30;
+      color: #e0e0e0;
+      border: 1px solid #486250;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .tune-btn-sm {
+      background: #1b2820;
+      color: #8be0a5;
+      border: 1px solid #3c5443;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    #tuneFallbackBox {
+      margin-top: 6px;
+    }
+    #tuneFallbackText {
+      width: 100%;
+      background: #141f18;
+      border: 1px solid #446;
+      color: #00e676;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 4px 6px;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -469,7 +570,7 @@
     <!-- Title Screen (タイトル画面) -->
     <div id="title-screen">
       <div class="title-header">
-        <div class="title-version">ver 0.8.7</div>
+        <div class="title-version">ver 0.9.0</div>
         <div class="title-main">峠 RACER</div>
         <div class="title-sub">DRIFT & DASH</div>
       </div>
@@ -538,6 +639,36 @@
         <button class="title-start-btn" id="modalActionBtn" type="button" style="padding:10px 20px; font-size:16px;">もう一度走る</button>
       </div>
     </div>
+
+    <!-- Tune Panel (?tune=1 のみ表示) -->
+    <div id="tune-panel">
+      <div class="tune-header">
+        <span>🔧 表示調整モード (?tune=1)</span>
+        <button id="tuneToggleCamBtn" type="button" class="tune-btn-sm">🎥 カメラ: 自動追従</button>
+      </div>
+      <div class="tune-row">
+        <label>コーススケール</label>
+        <input type="range" id="tuneCourseScale" min="0.5" max="2.0" step="0.05" value="1.0">
+        <span class="tune-val" id="tuneCourseScaleVal">1.00</span>
+      </div>
+      <div class="tune-row">
+        <label>車のサイズ</label>
+        <input type="range" id="tuneCarSize" min="0.5" max="2.0" step="0.05" value="1.0">
+        <span class="tune-val" id="tuneCarSizeVal">1.00</span>
+      </div>
+      <div class="tune-row">
+        <label>視点の距離 (ズーム)</label>
+        <input type="range" id="tuneCamDist" min="0.5" max="2.0" step="0.05" value="1.0">
+        <span class="tune-val" id="tuneCamDistVal">1.00</span>
+      </div>
+      <div class="tune-actions">
+        <button id="tuneCopyBtn" type="button" class="tune-btn">📋 値をコピー (JSON)</button>
+        <button id="tuneResetBtn" type="button" class="tune-btn-sub">🔄 リセット</button>
+      </div>
+      <div id="tuneFallbackBox" style="display: none;">
+        <input type="text" id="tuneFallbackText" readonly>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -546,6 +677,14 @@
    車両・操作パラメータ定数（ここを変更して挙動を自由に調整できます）
    ========================================================================== */
 const PHYSICS_CONFIG = {
+  // コース進行方向設定 (false: 上から下へ走る, true: 反転して下から上へ走る)
+  TRACK_INVERT_DIRECTION: false,
+
+  // 基準寸法
+  BASE_CAR_LENGTH: 38,
+  BASE_CAR_WIDTH: 20,
+  BASE_ROAD_WIDTH: 240,
+
   // 最高速度 (合成速度に必ず適用)
   TOP_SPEED_STRAIGHT: 13.5,     // 直線ダッシュ時の最高速度
   TOP_SPEED_DRIFT: 12.0,        // ドリフト中最高速度
@@ -623,17 +762,21 @@ function normalizeAngle(a) {
    Touge Track
    ========================================================================== */
 class Track {
-  constructor() {
+  constructor(scale = 1.0) {
     this.points = [];
-    this.roadWidth = 240;
+    this.scale = scale;
+    this.roadWidth = PHYSICS_CONFIG.BASE_ROAD_WIDTH * scale;
     this.segments = [];
     this.trees = [];
     this.totalLength = 0;
-    this.generate();
+    this.generate(scale);
   }
 
-  generate() {
-    const keyNodes = [
+  generate(scale = 1.0) {
+    this.scale = scale;
+    this.roadWidth = PHYSICS_CONFIG.BASE_ROAD_WIDTH * scale;
+
+    const baseKeyNodes = [
       { x: 300,  y: 400 },
       { x: 950,  y: 400 },
       { x: 1550, y: 650 },
@@ -650,6 +793,24 @@ class Track {
       { x: 1400, y: 5050 },
       { x: 2200, y: 5050 },
     ];
+
+    // コースのスタート地点を画面の上側にし、走る向きを上から下にする(90度回転)
+    // TRACK_INVERT_DIRECTION で反転可能 (false: 上から下へ走る, true: 下から上へ走る)
+    const theta = PHYSICS_CONFIG.TRACK_INVERT_DIRECTION ? -Math.PI / 2 : Math.PI / 2;
+    const cosT = Math.cos(theta);
+    const sinT = Math.sin(theta);
+    const rotNodes = baseKeyNodes.map(p => ({
+      x: p.x * cosT - p.y * sinT,
+      y: p.x * sinT + p.y * cosT
+    }));
+
+    const minX = Math.min(...rotNodes.map(p => p.x));
+    const minY = Math.min(...rotNodes.map(p => p.y));
+
+    const keyNodes = rotNodes.map(p => ({
+      x: (p.x - minX + 400) * scale,
+      y: (p.y - minY + 400) * scale
+    }));
 
     this.points = [];
     const stepPerSeg = 24;
@@ -702,11 +863,11 @@ class Track {
       const pt = this.points[i];
       const seg = this.segments[Math.min(i, this.segments.length - 1)];
       [-1, 1].forEach(side => {
-        const offset = (this.roadWidth / 2 + 60 + Math.random() * 70) * side;
+        const offset = (this.roadWidth / 2 + (60 + Math.random() * 70) * scale) * side;
         this.trees.push({
           x: pt.x + seg.nx * offset,
           y: pt.y + seg.ny * offset,
-          size: 26 + Math.random() * 16,
+          size: (26 + Math.random() * 16) * scale,
           color: ['#1d3824', '#24452c', '#18311e'][Math.floor(Math.random() * 3)]
         });
       });
@@ -821,10 +982,11 @@ class SkidpadArea {
 
   checkCollision(car, particles) {
     const dist = Math.hypot(car.x, car.y);
-    if (dist > this.radius - 40) {
+    const safeLimit = this.radius - (car.length ? car.length / 2 : 40);
+    if (dist > safeLimit) {
       const ang = Math.atan2(car.y, car.x);
-      car.x = Math.cos(ang) * (this.radius - 40);
-      car.y = Math.sin(ang) * (this.radius - 40);
+      car.x = Math.cos(ang) * safeLimit;
+      car.y = Math.sin(ang) * safeLimit;
 
       const nx = Math.cos(ang);
       const ny = Math.sin(ang);
@@ -852,6 +1014,10 @@ class Car {
     this.startY = startY;
     this.startAngle = startAngle;
 
+    this.sizeScale = 1.0;
+    this.length = PHYSICS_CONFIG.BASE_CAR_LENGTH;
+    this.width = PHYSICS_CONFIG.BASE_CAR_WIDTH;
+
     this.lastSafe = {
       x: startX,
       y: startY,
@@ -863,6 +1029,12 @@ class Car {
     this.reset();
   }
 
+  updateSize(sizeScale = 1.0) {
+    this.sizeScale = sizeScale;
+    this.length = PHYSICS_CONFIG.BASE_CAR_LENGTH * sizeScale;
+    this.width = PHYSICS_CONFIG.BASE_CAR_WIDTH * sizeScale;
+  }
+
   reset(x = this.startX, y = this.startY, angle = this.startAngle) {
     this.x = Number.isFinite(x) ? x : 0;
     this.y = Number.isFinite(y) ? y : 0;
@@ -871,8 +1043,9 @@ class Car {
     this.heading = Number.isFinite(angle) ? normalizeAngle(angle) : 0;
     this.speed = 0;
 
-    this.width = 20;
-    this.length = 38;
+    this.sizeScale = this.sizeScale || 1.0;
+    this.length = PHYSICS_CONFIG.BASE_CAR_LENGTH * this.sizeScale;
+    this.width = PHYSICS_CONFIG.BASE_CAR_WIDTH * this.sizeScale;
 
     this.targetPos = null;        // タップされた目標地点 { x, y }
     this.targetHeading = 0;       // 目標方位
@@ -1021,15 +1194,16 @@ class Car {
       this.driftCooldownTimer = Math.max(0, this.driftCooldownTimer - safeDt);
     }
 
-    // ブースト倍率と最高速
+    // ブースト倍率と最高速（車のサイズスケールに連動）
+    const carScale = this.sizeScale || 1.0;
     const boostMult = 1.0 + (this.boostLevel - 1) * 0.35;
-    const maxSpeed = (this.isDrifting ? PHYSICS_CONFIG.TOP_SPEED_DRIFT : PHYSICS_CONFIG.TOP_SPEED_STRAIGHT) * boostMult;
+    const maxSpeed = (this.isDrifting ? PHYSICS_CONFIG.TOP_SPEED_DRIFT : PHYSICS_CONFIG.TOP_SPEED_STRAIGHT) * boostMult * carScale;
     this.speed = Math.hypot(this.vx, this.vy);
 
     if (this.isDrifting) {
       // =========================================================================
       // アーケード方式ドリフト
-      // 速度ベクトルの方向を一定半径(150px)で目標方位へ回し、車首は30度先行
+      // 速度ベクトルの方向を一定半径(150px * carScale)で目標方位へ回し、車首は30度先行
       // =========================================================================
       this.driftTimer += safeDt;
 
@@ -1046,9 +1220,9 @@ class Car {
       if (absDiffDeg <= PHYSICS_CONFIG.DRIFT_EXIT_ANGLE_DIFF_DEG || this.driftTimer >= PHYSICS_CONFIG.DRIFT_SAFETY_MAX_SEC) {
         this.endDriftWithRecovery();
       } else {
-        // 1. 旋回の角速度は速度÷旋回半径で求める(旋回半径150pxで一定)。上下限1.5〜4.0 rad/s
+        // 1. 旋回の角速度は速度÷旋回半径で求める(旋回半径150px * carScaleで一定)。上下限1.5〜4.0 rad/s
         const speedPxPerSec = this.speed * 60;
-        let omega = speedPxPerSec / PHYSICS_CONFIG.DRIFT_TURN_RADIUS;
+        let omega = speedPxPerSec / (PHYSICS_CONFIG.DRIFT_TURN_RADIUS * carScale);
         omega = Math.max(PHYSICS_CONFIG.DRIFT_OMEGA_MIN, Math.min(PHYSICS_CONFIG.DRIFT_OMEGA_MAX, omega));
 
         const turnStep = Math.sign(diffToTarget) * Math.min(Math.abs(diffToTarget), omega * safeDt);
@@ -1061,7 +1235,7 @@ class Car {
         // 3. ドリフト中の推力は通常の40%
         if (this.isAccelerating && this.speed < maxSpeed * 0.95) {
           const dtScale = safeDt / (1/60);
-          this.speed += PHYSICS_CONFIG.ACCEL_POWER * PHYSICS_CONFIG.DRIFT_ACCEL_RATIO * dtScale;
+          this.speed += (PHYSICS_CONFIG.ACCEL_POWER * carScale) * PHYSICS_CONFIG.DRIFT_ACCEL_RATIO * dtScale;
         }
 
         // 速度ベクトルを旋回後の角度と大きさで再構成
@@ -1085,7 +1259,7 @@ class Car {
       // =========================================================================
       let targetAngleDiffDeg = 0;
 
-      // 目標地点の到達・通過チェック（通常時のみ破棄）
+      // 目標地点の到達・通過チェック（通常時のみ破棄、車の長さに連動）
       if (this.targetPos) {
         const dx = this.targetPos.x - this.x;
         const dy = this.targetPos.y - this.y;
@@ -1095,7 +1269,8 @@ class Car {
         const headY = Math.sin(this.heading);
         const forwardDot = dx * headX + dy * headY;
 
-        if (dist < 40 || forwardDot < -4) {
+        const arrivalDist = this.length * 1.05; // 40px相当 (BASE_CAR_LENGTH 38)
+        if (dist < arrivalDist || forwardDot < -4 * carScale) {
           this.targetPos = null;
           this.isAccelerating = false;
           this.angularVelocity = 0;
@@ -1113,7 +1288,7 @@ class Car {
       // ドリフト終了時の復帰中（約0.2秒かけて車体の向きを速度方向へ戻す）
       if (this.driftRecoverTimer > 0) {
         this.driftRecoverTimer -= safeDt;
-        if (this.speed > 0.5) {
+        if (this.speed > 0.5 * carScale) {
           const moveAngle = Math.atan2(this.vy, this.vx);
           const alignDiff = normalizeAngle(moveAngle - this.heading);
           const recoverFactor = Math.min(1.0, safeDt / Math.max(0.01, this.driftRecoverTimer + safeDt * 0.5));
@@ -1130,20 +1305,20 @@ class Car {
 
       // 舵を切っていない間の進行方向へのセルフアライニング
       const isNotSteering = !this.targetPos || targetAngleDiffDeg < 10.0;
-      if (isNotSteering && this.speed > 0.5 && this.driftRecoverTimer <= 0) {
+      if (isNotSteering && this.speed > 0.5 * carScale && this.driftRecoverTimer <= 0) {
         const moveAngle = Math.atan2(this.vy, this.vx);
         const alignDiff = normalizeAngle(moveAngle - this.heading);
         const alignFactor = Math.min(1.0, PHYSICS_CONFIG.ALIGN_TO_VELOCITY_RATE * (safeDt / (1/60)));
         this.heading = normalizeAngle(this.heading + alignDiff * alignFactor);
       }
 
-      // 通常時の推力（100%）
+      // 通常時の推力（100%、carScale連動）
       if (this.isAccelerating && this.speed < maxSpeed * 0.95) {
         const fX = Math.cos(this.heading);
         const fY = Math.sin(this.heading);
         const dtScale = safeDt / (1/60);
-        this.vx += fX * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
-        this.vy += fY * PHYSICS_CONFIG.ACCEL_POWER * dtScale;
+        this.vx += fX * (PHYSICS_CONFIG.ACCEL_POWER * carScale) * dtScale;
+        this.vy += fY * (PHYSICS_CONFIG.ACCEL_POWER * carScale) * dtScale;
       }
 
       // 通常時の横方向グリップ（復帰中は1.0でスピンや急変を防止）
@@ -1181,8 +1356,8 @@ class Car {
       this.speed = maxSpeed;
     }
 
-    // 速度が5px/s未満 (約0.083px/frame未満) になったら、速度と角速度を0にする
-    if (this.speed < 0.083) {
+    // 速度が5px/s未満 (約0.083px/frame未満 * carScale) になったら、速度と角速度を0にする
+    if (this.speed < 0.083 * carScale) {
       this.vx = 0;
       this.vy = 0;
       this.speed = 0;
@@ -1191,7 +1366,7 @@ class Car {
 
     // 7. 1フレームの移動量が壁の厚みを超えないように、移動と衝突判定を複数のサブステップに分割する
     const frameDist = Math.hypot(this.vx, this.vy);
-    const maxStepDist = 4.0; // 1ステップ最大4px
+    const maxStepDist = 4.0 * carScale; // 1ステップ最大4px相当
     const steps = Math.max(1, Math.ceil(frameDist / maxStepDist));
     const stepDx = this.vx / steps;
     const stepDy = this.vy / steps;
@@ -1224,11 +1399,11 @@ class Car {
 
     this.speed = Math.hypot(this.vx, this.vy);
 
-    if (this.speed > 1.2) {
+    if (this.speed > 1.2 * carScale) {
       this.noCrashDistance += this.speed;
-      if (this.boostLevel === 1 && this.noCrashDistance > 600) {
+      if (this.boostLevel === 1 && this.noCrashDistance > 600 * carScale) {
         this.boostLevel = 2;
-      } else if (this.boostLevel === 2 && this.noCrashDistance > 1600) {
+      } else if (this.boostLevel === 2 && this.noCrashDistance > 1600 * carScale) {
         this.boostLevel = 3;
       }
     }
@@ -1244,7 +1419,7 @@ class Car {
     }
 
     const halfRoad = track.roadWidth / 2;
-    const safeLimit = halfRoad - 8;
+    const safeLimit = Math.max(10, halfRoad - (this.width / 2) - 2);
 
     if (rel.minDist > safeLimit) {
       const proj = rel.proj;
@@ -1423,10 +1598,26 @@ class TougeGame {
 
     this.gameMode = 'FREE';
     this.appState = 'TITLE';
-    this.track = new Track();
+
+    // 表示調整モード (?tune=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    this.isTuneMode = urlParams.get('tune') === '1';
+    this.tuneConfig = {
+      COURSE_SCALE: 1.0,
+      CAR_SIZE: 1.0,
+      CAMERA_DISTANCE: 1.0
+    };
+
+    this.cameraFreeMode = false;
+    this.isPanningCamera = false;
+    this.panStartPos = { x: 0, y: 0 };
+    this.panCamStart = { x: 0, y: 0 };
+
+    this.track = new Track(this.tuneConfig.COURSE_SCALE);
     this.skidpad = new SkidpadArea();
 
     this.car = new Car(0, 0, 0);
+    this.car.updateSize(this.tuneConfig.CAR_SIZE);
     this.particles = new ParticleSystem();
 
     this.camera = { x: 0, y: 0 };
@@ -1439,11 +1630,120 @@ class TougeGame {
     this.maxComboAchieved = 0;
     this.lastFrameTime = performance.now();
 
+    if (this.isTuneMode) {
+      this.initTunePanel();
+    }
+
     this.initEvents();
     this.resize();
     this.drawTitleHero();
 
     requestAnimationFrame(() => this.loop());
+  }
+
+  initTunePanel() {
+    const tunePanel = document.getElementById('tune-panel');
+    if (!tunePanel) return;
+    tunePanel.style.display = 'block';
+
+    // パネルの操作はゲームの操作（車の操舵など）と競合しないようイベント伝播を停止
+    const stopEvts = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'pointerdown'];
+    stopEvts.forEach(evtName => {
+      tunePanel.addEventListener(evtName, (e) => {
+        e.stopPropagation();
+      }, { passive: false });
+    });
+
+    const sCourse = document.getElementById('tuneCourseScale');
+    const vCourse = document.getElementById('valCourseScale');
+    const sCar = document.getElementById('tuneCarSize');
+    const vCar = document.getElementById('valCarSize');
+    const sCam = document.getElementById('tuneCameraDist');
+    const vCam = document.getElementById('valCameraDist');
+    const btnCopy = document.getElementById('btnCopyTune');
+    const btnReset = document.getElementById('btnResetTune');
+    const btnCamMode = document.getElementById('btnToggleCamMode');
+    const fallbackBox = document.getElementById('tuneFallbackBox');
+    const fallbackText = document.getElementById('tuneFallbackText');
+
+    sCourse.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      this.tuneConfig.COURSE_SCALE = val;
+      vCourse.textContent = val.toFixed(2);
+      this.track.generate(val);
+      if (this.gameMode === 'TOUGE' && this.appState === 'PLAYING') {
+        this.car.currentSegIndex = 0;
+      }
+    });
+
+    sCar.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      this.tuneConfig.CAR_SIZE = val;
+      vCar.textContent = val.toFixed(2);
+      this.car.updateSize(val);
+    });
+
+    sCam.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      this.tuneConfig.CAMERA_DISTANCE = val;
+      vCam.textContent = val.toFixed(2);
+    });
+
+    btnCopy.addEventListener('click', () => {
+      const exportData = {
+        COURSE_SCALE: parseFloat(this.tuneConfig.COURSE_SCALE.toFixed(2)),
+        CAR_SIZE: parseFloat(this.tuneConfig.CAR_SIZE.toFixed(2)),
+        CAMERA_DISTANCE: parseFloat(this.tuneConfig.CAMERA_DISTANCE.toFixed(2))
+      };
+      const jsonStr = JSON.stringify(exportData, null, 2);
+
+      const showFallback = () => {
+        fallbackBox.style.display = 'block';
+        fallbackText.value = jsonStr;
+        fallbackText.focus();
+        fallbackText.select();
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(jsonStr).then(() => {
+          const orig = btnCopy.textContent;
+          btnCopy.textContent = '✅ コピー完了!';
+          setTimeout(() => { btnCopy.textContent = orig; }, 1500);
+        }).catch(err => {
+          console.warn('Clipboard write failed, showing fallback textarea:', err);
+          showFallback();
+        });
+      } else {
+        showFallback();
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      this.tuneConfig.COURSE_SCALE = 1.0;
+      this.tuneConfig.CAR_SIZE = 1.0;
+      this.tuneConfig.CAMERA_DISTANCE = 1.0;
+
+      sCourse.value = 1.0;
+      vCourse.textContent = '1.00';
+      this.track.generate(1.0);
+
+      sCar.value = 1.0;
+      vCar.textContent = '1.00';
+      this.car.updateSize(1.0);
+
+      sCam.value = 1.0;
+      vCam.textContent = '1.00';
+
+      this.cameraFreeMode = false;
+      btnCamMode.textContent = 'カメラ: 追従中';
+      fallbackBox.style.display = 'none';
+    });
+
+    btnCamMode.addEventListener('click', () => {
+      this.cameraFreeMode = !this.cameraFreeMode;
+      btnCamMode.textContent = this.cameraFreeMode ? 'カメラ: フリー' : 'カメラ: 追従中';
+      btnCamMode.style.color = this.cameraFreeMode ? '#ffeb3b' : '#8be0a5';
+    });
   }
 
   initEvents() {
@@ -1492,11 +1792,38 @@ class TougeGame {
     });
 
     // 1. 目標地点は pointerdown の瞬間に1回だけ設定し、押している間は更新しない
+    // 表示調整モード中(?tune=1)は、コース外をドラッグすることで視点(カメラ)をパン移動できる
     const handleStart = (clientX, clientY) => {
       if (this.appState !== 'PLAYING') return;
 
       this.isPointerDown = true;
       const worldPos = this.screenToWorld(clientX, clientY);
+
+      if (this.isTuneMode) {
+        let isOutsideTrack = false;
+        if (this.gameMode === 'TOUGE') {
+          const rel = this.track.getTrackRelationLocal(worldPos.x, worldPos.y, this.car.currentSegIndex);
+          const roadHalf = this.track.roadWidth / 2;
+          isOutsideTrack = (rel.distToCenter > roadHalf + 40);
+        } else {
+          const dist = Math.hypot(worldPos.x, worldPos.y);
+          isOutsideTrack = (dist > this.skidpad.radius + 40);
+        }
+
+        if (isOutsideTrack || this.cameraFreeMode) {
+          this.isPanningCamera = true;
+          this.panStartPos = { x: clientX, y: clientY };
+          this.panCamStart = { x: this.camera.x, y: this.camera.y };
+          this.cameraFreeMode = true;
+          const btnCamMode = document.getElementById('btnToggleCamMode');
+          if (btnCamMode) {
+            btnCamMode.textContent = 'カメラ: フリー';
+            btnCamMode.style.color = '#ffeb3b';
+          }
+          return;
+        }
+      }
+
       this.car.setTarget(worldPos.x, worldPos.y);
 
       this.tapIndicator = {
@@ -1508,13 +1835,19 @@ class TougeGame {
       };
     };
 
-    // 押しっぱなし・ドラッグ中でも新しい目標や推力を追加しない
     const handleMove = (clientX, clientY) => {
-      // 意図的な何もしない処理 (長押しで走り続けるのを防止)
+      if (this.isPanningCamera && this.isTuneMode) {
+        const zoom = 1.0 / (this.tuneConfig ? this.tuneConfig.CAMERA_DISTANCE : 1.0);
+        const dx = (clientX - this.panStartPos.x) / zoom;
+        const dy = (clientY - this.panStartPos.y) / zoom;
+        this.camera.x = this.panCamStart.x - dx;
+        this.camera.y = this.panCamStart.y - dy;
+      }
     };
 
     const handleEnd = () => {
       this.isPointerDown = false;
+      this.isPanningCamera = false;
     };
 
     this.canvas.addEventListener('touchstart', (e) => {
@@ -1648,9 +1981,10 @@ class TougeGame {
     const sy = clientY - rect.top;
     const cx = this.width / 2;
     const cy = this.height / 2;
+    const zoom = 1.0 / (this.tuneConfig ? this.tuneConfig.CAMERA_DISTANCE : 1.0);
     return {
-      x: (sx - cx) + this.camera.x,
-      y: (sy - cy) + this.camera.y
+      x: (sx - cx) / zoom + this.camera.x,
+      y: (sy - cy) / zoom + this.camera.y
     };
   }
 
@@ -1665,12 +1999,14 @@ class TougeGame {
 
   applyModeSpawn() {
     if (this.gameMode === 'FREE') {
-      this.car.reset(0, 0, 0);
+      const freeAngle = PHYSICS_CONFIG.TRACK_INVERT_DIRECTION ? -Math.PI / 2 : Math.PI / 2;
+      this.car.reset(0, 0, freeAngle);
       this.camera.x = 0;
       this.camera.y = 0;
     } else {
-      const startNode = this.track.points[0];
-      const secondNode = this.track.points[4];
+      const pts = this.track.points;
+      const startNode = pts[0];
+      const secondNode = pts[Math.min(4, pts.length - 1)];
       const initialAngle = Math.atan2(secondNode.y - startNode.y, secondNode.x - startNode.x);
       this.car.reset(startNode.x, startNode.y, initialAngle);
       this.camera.x = startNode.x;
@@ -1766,13 +2102,16 @@ class TougeGame {
       }
     }
 
-    const leadX = Math.cos(this.car.angle) * (this.car.speed * 8);
-    const leadY = Math.sin(this.car.angle) * (this.car.speed * 8);
-    const targetCamX = this.car.x + leadX;
-    const targetCamY = this.car.y + leadY;
+    // カメラの追従（カメラフリーモードでない時のみ車に追従）
+    if (!this.cameraFreeMode) {
+      const leadX = Math.cos(this.car.heading) * (this.car.speed * 8);
+      const leadY = Math.sin(this.car.heading) * (this.car.speed * 8);
+      const targetCamX = this.car.x + leadX;
+      const targetCamY = this.car.y + leadY;
 
-    this.camera.x += (targetCamX - this.camera.x) * 0.12;
-    this.camera.y += (targetCamY - this.camera.y) * 0.12;
+      this.camera.x += (targetCamX - this.camera.x) * 0.12;
+      this.camera.y += (targetCamY - this.camera.y) * 0.12;
+    }
 
     if (this.tapIndicator) {
       this.tapIndicator.radius += 1.8;
@@ -1790,14 +2129,20 @@ class TougeGame {
     ctx.save();
     const cx = this.width / 2;
     const cy = this.height / 2;
-    ctx.translate(cx - this.camera.x, cy - this.camera.y);
+    const zoom = 1.0 / (this.tuneConfig ? this.tuneConfig.CAMERA_DISTANCE : 1.0);
+    ctx.translate(cx, cy);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-this.camera.x, -this.camera.y);
+
+    const viewW = (this.width / zoom) * 1.5;
+    const viewH = (this.height / zoom) * 1.5;
 
     if (this.gameMode === 'TOUGE') {
       ctx.fillStyle = '#1c2820';
-      ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
+      ctx.fillRect(this.camera.x - viewW, this.camera.y - viewH, viewW * 2, viewH * 2);
       this.renderTrack(ctx);
     } else {
-      this.renderSkidpad(ctx);
+      this.renderSkidpad(ctx, viewW, viewH);
     }
 
     this.particles.draw(ctx);
@@ -1816,17 +2161,17 @@ class TougeGame {
     this.renderCar(ctx);
 
     if (this.gameMode === 'TOUGE') {
-      this.renderTrees(ctx);
+      this.renderTrees(ctx, viewW, viewH);
     }
 
     ctx.restore();
     this.renderMinimap();
   }
 
-  renderSkidpad(ctx) {
+  renderSkidpad(ctx, viewW = this.width, viewH = this.height) {
     const pad = this.skidpad;
     ctx.fillStyle = '#222824';
-    ctx.fillRect(this.camera.x - this.width, this.camera.y - this.height, this.width * 2, this.height * 2);
+    ctx.fillRect(this.camera.x - viewW, this.camera.y - viewH, viewW * 2, viewH * 2);
 
     ctx.fillStyle = '#2c3530';
     ctx.beginPath();
@@ -1837,10 +2182,10 @@ class TougeGame {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 2;
     const gridSize = 160;
-    const startX = Math.floor((this.camera.x - this.width) / gridSize) * gridSize;
-    const endX = this.camera.x + this.width;
-    const startY = Math.floor((this.camera.y - this.height) / gridSize) * gridSize;
-    const endY = this.camera.y + this.height;
+    const startX = Math.floor((this.camera.x - viewW) / gridSize) * gridSize;
+    const endX = this.camera.x + viewW;
+    const startY = Math.floor((this.camera.y - viewH) / gridSize) * gridSize;
+    const endY = this.camera.y + viewH;
 
     ctx.beginPath();
     for (let x = startX; x <= endX; x += gridSize) {
@@ -1872,7 +2217,7 @@ class TougeGame {
 
     for (let i = 0; i < pad.cones.length; i++) {
       const c = pad.cones[i];
-      if (Math.abs(c.x - this.camera.x) > this.width || Math.abs(c.y - this.camera.y) > this.height) continue;
+      if (Math.abs(c.x - this.camera.x) > viewW || Math.abs(c.y - this.camera.y) > viewH) continue;
 
       ctx.save();
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -1954,10 +2299,10 @@ class TougeGame {
     ctx.restore();
   }
 
-  renderTrees(ctx) {
+  renderTrees(ctx, viewW = this.width, viewH = this.height) {
     for (let i = 0; i < this.track.trees.length; i++) {
       const t = this.track.trees[i];
-      if (Math.abs(t.x - this.camera.x) > this.width || Math.abs(t.y - this.camera.y) > this.height) continue;
+      if (Math.abs(t.x - this.camera.x) > viewW || Math.abs(t.y - this.camera.y) > viewH) continue;
 
       ctx.save();
       ctx.translate(t.x, t.y);
@@ -2031,29 +2376,44 @@ class TougeGame {
     mCtx.clearRect(0, 0, 76, 76);
 
     if (this.gameMode === 'TOUGE') {
-      const minX = 100, maxX = 2400;
-      const minY = 200, maxY = 5200;
-      const scaleX = 62 / (maxX - minX);
-      const scaleY = 62 / (maxY - minY);
+      const pts = this.track.points;
+      if (!pts || pts.length < 2) return;
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < pts.length; i += 4) {
+        const p = pts[i];
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      const padding = 150 * (this.tuneConfig ? this.tuneConfig.COURSE_SCALE : 1.0);
+      minX -= padding; maxX += padding;
+      minY -= padding; maxY += padding;
+      const rangeX = Math.max(1, maxX - minX);
+      const rangeY = Math.max(1, maxY - minY);
+      const scale = Math.min(62 / rangeX, 62 / rangeY);
+
+      const offsetX = 7 + (62 - rangeX * scale) / 2;
+      const offsetY = 7 + (62 - rangeY * scale) / 2;
 
       mCtx.save();
-      mCtx.translate(7, 7);
+      mCtx.translate(offsetX, offsetY);
 
       mCtx.strokeStyle = '#506c58';
       mCtx.lineWidth = 3.5;
       mCtx.lineCap = 'round';
       mCtx.beginPath();
-      const pts = this.track.points;
       for (let i = 0; i < pts.length; i += 4) {
-        const mx = (pts[i].x - minX) * scaleX;
-        const my = (pts[i].y - minY) * scaleY;
+        const mx = (pts[i].x - minX) * scale;
+        const my = (pts[i].y - minY) * scale;
         if (i === 0) mCtx.moveTo(mx, my);
         else mCtx.lineTo(mx, my);
       }
       mCtx.stroke();
 
-      const carMx = (this.car.x - minX) * scaleX;
-      const carMy = (this.car.y - minY) * scaleY;
+      const carMx = (this.car.x - minX) * scale;
+      const carMy = (this.car.y - minY) * scale;
       mCtx.fillStyle = '#ff1744';
       mCtx.beginPath();
       mCtx.arc(carMx, carMy, 3, 0, Math.PI * 2);
